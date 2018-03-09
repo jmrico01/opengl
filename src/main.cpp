@@ -279,7 +279,7 @@ int main(int argc, char* argv[])
     }
 
     HalfEdgeMesh mesh = HalfEdgeMeshFromObj("data/models/cube.obj");
-    if (!mesh.vertices) {
+    if (mesh.vertices.size == 0) {
         printf("not loaded\n");
     }
     HalfEdgeMeshGL meshGL = LoadHalfEdgeMeshGL(mesh);

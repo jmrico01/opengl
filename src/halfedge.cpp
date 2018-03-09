@@ -4,8 +4,8 @@
 #include <map>
 
 #include "main.h"
-#include "km_lib.h"
 #include "km_math.h"
+#include "ogl_base.h"
 
 #define OBJ_LINE_MAX 512
 
@@ -29,11 +29,10 @@ Vec3 ParseVec3(char* str)
 
 HalfEdgeMesh HalfEdgeMeshFromObj(const char* filePath)
 {
-    HalfEdgeMesh mesh = {
-        0, nullptr,
-        0, nullptr,
-        0, nullptr
-    };
+    HalfEdgeMesh mesh;
+    mesh.vertices.Init();
+    mesh.faces.Init();
+    mesh.halfEdges.Init();
 
     char fullPath[PATH_MAX_LENGTH];
     CatStrings(GetAppPath(), filePath, fullPath, PATH_MAX_LENGTH);
@@ -44,8 +43,6 @@ HalfEdgeMesh HalfEdgeMeshFromObj(const char* filePath)
     }
 
     char line[OBJ_LINE_MAX];
-    DynamicArray<Vertex> vertices;
-    vertices.Init();
     DynamicArray<int> faceInds;
     faceInds.Init();
 
@@ -55,8 +52,10 @@ HalfEdgeMesh HalfEdgeMeshFromObj(const char* filePath)
         }
         else if (line[0] == 'v') {
             if (line[1] == ' ') {
-                Vec3 vertexPos = ParseVec3(&line[2]);
-                vertices.Append({ vertexPos, 0 });
+                Vertex vertex;
+                vertex.pos = ParseVec3(&line[2]);
+                vertex.halfEdge = 0; // This is set later
+                mesh.vertices.Append(vertex);
             }
             else if (line[1] == 'n') {
                 printf("vertex normal! UNHANDLED\n");
@@ -83,28 +82,24 @@ HalfEdgeMesh HalfEdgeMeshFromObj(const char* filePath)
         }
     }
 
-    mesh.edgeMap = new std::map<std::pair<uint32, uint32>, uint32>();
-    DynamicArray<HalfEdge> halfEdges;
-    halfEdges.Init();
-    DynamicArray<Face> faces;
-    faces.Init();
+    std::map<std::pair<uint32, uint32>, uint32> edgeMap;
 
     uint32 faceVerts = 0;
     for (uint32 i = 0; i < faceInds.size; i++) {
-        if (faceInds.data[i] == -1 || i == faceInds.size - 1) {
+        if (faceInds[i] == -1 || i == faceInds.size - 1) {
             // Create face
             Face face;
-            face.halfEdge = halfEdges.size - 1;
-            faces.Append(face);
+            face.halfEdge = mesh.halfEdges.size - 1;
+            mesh.faces.Append(face);
             
             faceVerts = 0;
             continue;
         }
 
-        uint32 vertSrc = faceInds.data[i] - 1;
-        uint32 vertDst = faceInds.data[i + 1] - 1;
-        if (faceInds.data[i + 1] == -1) {
-            vertDst = faceInds.data[i - faceVerts] - 1;
+        uint32 vertSrc = faceInds[i] - 1;
+        uint32 vertDst = faceInds[i + 1] - 1;
+        if (faceInds[i + 1] == -1) {
+            vertDst = faceInds[i - faceVerts] - 1;
         }
 
         // Create edge, i -> i + 1
@@ -112,49 +107,37 @@ HalfEdgeMesh HalfEdgeMeshFromObj(const char* filePath)
         std::pair<int, int> forward(vertSrc, vertDst);
         std::pair<int, int> backward(vertDst, vertSrc);
         HalfEdge he;
-        he.next = halfEdges.size + 1;
-        if (faceInds.data[i + 1] == -1) {
-            he.next = halfEdges.size - faceVerts;
+        he.next = mesh.halfEdges.size + 1;
+        if (faceInds[i + 1] == -1) {
+            he.next = mesh.halfEdges.size - faceVerts;
         }
-        auto edgeBackward = mesh.edgeMap->find(backward);
-        if (edgeBackward != mesh.edgeMap->end()) {
+        auto edgeBackward = edgeMap.find(backward);
+        if (edgeBackward != edgeMap.end()) {
             he.twin = edgeBackward->second;
-            halfEdges.data[edgeBackward->second].twin = halfEdges.size;
-            printf("Connected twins: %d and %d\n",
-                edgeBackward->second, halfEdges.size);
+            mesh.halfEdges[edgeBackward->second].twin =
+                mesh.halfEdges.size;
         }
         else {
             he.twin = 0;
         }
         he.vertex = vertDst;
-        he.face = faces.size;
+        he.face = mesh.faces.size;
 
         // Assign forward edge i -> i + 1 to vertex i
-        vertices.data[vertSrc].halfEdge = halfEdges.size;
+        mesh.vertices[vertSrc].halfEdge = mesh.halfEdges.size;
 
-        // Add edge to edgeMap and halfEdges array
-        auto res = mesh.edgeMap->insert(
-            std::make_pair(forward, halfEdges.size));
+        // Add edge to edgeMap and mesh.halfEdges array
+        auto res = edgeMap.insert(
+            std::make_pair(forward, mesh.halfEdges.size));
         if (!res.second) {
             printf("ERROR: Edge already in edgeMap\n");
         }
-        printf("mapped (%d, %d) -> %d\n", forward.first, forward.second,
-            halfEdges.size);
-        halfEdges.Append(he);
+        mesh.halfEdges.Append(he);
         faceVerts++;
     }
 
-    mesh.numVertices = vertices.size;
-    mesh.vertices = vertices.data;
-
-    mesh.numHalfEdges = halfEdges.size;
-    mesh.halfEdges = halfEdges.data;
-
-    mesh.numFaces = faces.size;
-    mesh.faces = faces.data;
-
     printf("----- VERTICES -----\n");
-    for (uint32 i = 0; i < mesh.numVertices; i++) {
+    for (uint32 i = 0; i < mesh.vertices.size; i++) {
         printf("%d: (%f, %f, %f) ; edge %d\n",
             i,
             mesh.vertices[i].pos.x,
@@ -163,7 +146,7 @@ HalfEdgeMesh HalfEdgeMeshFromObj(const char* filePath)
             mesh.vertices[i].halfEdge);
     }
     printf("----- HALF EDGES -----\n");
-    for (uint32 i = 0; i < mesh.numHalfEdges; i++) {
+    for (uint32 i = 0; i < mesh.halfEdges.size; i++) {
         printf("%d: next %d, twin: %d, vert %d, face %d\n",
             i,
             mesh.halfEdges[i].next, mesh.halfEdges[i].twin,
@@ -171,11 +154,13 @@ HalfEdgeMesh HalfEdgeMeshFromObj(const char* filePath)
             mesh.halfEdges[i].face);
     }
     printf("----- FACES -----\n");
-    for (uint32 i = 0; i < mesh.numFaces; i++) {
+    for (uint32 i = 0; i < mesh.faces.size; i++) {
         printf("%d: edge %d\n",
             i,
             mesh.faces[i].halfEdge);
     }
+
+    faceInds.Free();
 
     // TODO free mesh after this
     return mesh;
@@ -189,20 +174,45 @@ void SplitFaceMakeEdge(const HalfEdgeMesh& mesh,
 {
     uint32 edge = mesh.faces[f].halfEdge;
     uint32 eToV1 = edge;
-    // Search until e is the edge that points to v1.
-    do {
+    while (mesh.halfEdges[eToV1].vertex != v1) {
         eToV1 = mesh.halfEdges[eToV1].next;
-    } while (mesh.halfEdges[eToV1].vertex != v1);
+    }
+    uint32 eToV2 = edge;
+    while (mesh.halfEdges[eToV2].vertex != v2) {
+        eToV2 = mesh.halfEdges[eToV2].next;
+    }
 
-    // uint32 e = mesh.halfEdges[];
+    uint32 e = eToV2;
+    while (mesh.halfEdges[e].vertex != v1) {
+        e = mesh.halfEdges[e].next;
+        // Assign new face to edges v2 -> ... -> v1
+        mesh.halfEdges[e].face = mesh.faces.size;
+    }
+
+    // Update original face f
+    mesh.faces[f].halfEdge = mesh.halfEdges.size + 1; // v2 -> v1
+    // Create new face
+    Face newFace;
+    newFace.halfEdge = mesh.halfEdges.size; // v1 -> v2
+
+    // Create new half edges
+    HalfEdge v1v2;
+    v1v2.next = mesh.halfEdges[eToV2].next;
+    v1v2.twin = mesh.halfEdges.size + 1;
+    v1v2.vertex = v2;
+    v1v2.face = mesh.faces.size;
+    HalfEdge v2v1;
+    v2v1.next = mesh.halfEdges[eToV1].next;
+    v2v1.twin = mesh.halfEdges.size;
+    v2v1.vertex = v1;
+    v2v1.face = f;
 }
 
-void FreeHalfEdgeMesh(const HalfEdgeMesh& mesh)
+void FreeHalfEdgeMesh(HalfEdgeMesh* mesh)
 {
-    free(mesh.vertices);
-    free(mesh.faces);
-    free(mesh.halfEdges);
-    delete mesh.edgeMap;
+    mesh->vertices.Free();
+    mesh->faces.Free();
+    mesh->halfEdges.Free();
 }
 
 HalfEdgeMeshGL LoadHalfEdgeMeshGL(const HalfEdgeMesh& mesh)
@@ -213,7 +223,7 @@ HalfEdgeMeshGL LoadHalfEdgeMeshGL(const HalfEdgeMesh& mesh)
     DynamicArray<Vec3> vertices;
     vertices.Init();
 
-    for (uint32 i = 0; i < mesh.numFaces; i++) {
+    for (uint32 i = 0; i < mesh.faces.size; i++) {
         uint32 numEdges = 0;
         uint32 edge = mesh.faces[i].halfEdge;
         uint32 e = edge;

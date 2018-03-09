@@ -1,8 +1,8 @@
 #pragma once
 
 #include <GL/glew.h>
-#include <map>
 
+#include "km_lib.h"
 #include "km_math.h"
 
 struct HalfEdge;
@@ -24,14 +24,9 @@ struct HalfEdge {
 };
 
 struct HalfEdgeMesh {
-    uint32 numVertices;
-    Vertex* vertices;
-    uint32 numFaces;
-    Face* faces;
-    uint32 numHalfEdges;
-    HalfEdge* halfEdges;
-    // TODO stop using std god damnit
-    std::map<std::pair<uint32, uint32>, uint32>* edgeMap;
+    DynamicArray<Vertex> vertices;
+    DynamicArray<Face> faces;
+    DynamicArray<HalfEdge> halfEdges;
 };
 
 struct HalfEdgeMeshGL

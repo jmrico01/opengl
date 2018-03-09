@@ -10,6 +10,10 @@ struct DynamicArray
     void Init();
     void Append(T element);
     void Free();
+
+    T& operator[](int index) const {
+        return data[index];
+    }
 };
 
 /*
