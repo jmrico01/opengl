@@ -204,7 +204,7 @@ int main(int argc, char* argv[])
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     // Create GLFW window.
     GLFWwindow* window = glfwCreateWindow(
-        width_, height_, "PRINCE", NULL, NULL);
+        width_, height_, "OpenGL", NULL, NULL);
     if (!window) {
         glfwTerminate();
         return 1;
@@ -282,6 +282,11 @@ int main(int argc, char* argv[])
     if (!mesh.vertices) {
         printf("not loaded\n");
     }
+    HalfEdgeMeshGL meshGL = LoadHalfEdgeMeshGL(mesh);
+    printf("meshGL: va %d, vb %d, pid %d\n",
+        meshGL.vertexArray,
+        meshGL.vertexBuffer,
+        meshGL.programID);
 
     glfwSetFramebufferSizeCallback(window, FramebufferSizeCallback);
     // Set up input handling.
@@ -290,8 +295,6 @@ int main(int argc, char* argv[])
     glfwSetMouseButtonCallback(window, &MouseCallback);
 
     glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-
-    
 
     while (!glfwWindowShouldClose(window)) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -335,7 +338,7 @@ int main(int argc, char* argv[])
             Vec3 titlePos = { 512.0f, 680.0f, 0.0f };
             Vec4 titleColor = { 0.1f, 0.1f, 0.1f, 1.0f };
             Vec2 titleAnchor = { 0.5f, 0.0f };
-            const char* title = "PRINCE";
+            const char* title = "OpenGL";
             DrawText(textGL,
                 cmSerifBold, title, titlePos, titleAnchor, titleColor);
             int titleWidth = GetTextWidth(cmSerifBold, title);

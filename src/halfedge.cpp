@@ -83,13 +83,9 @@ HalfEdgeMesh HalfEdgeMeshFromObj(const char* filePath)
         }
     }
 
-    std::map<std::pair<uint32, uint32>, uint32> edgeMap;
+    mesh.edgeMap = new std::map<std::pair<uint32, uint32>, uint32>();
     DynamicArray<HalfEdge> halfEdges;
     halfEdges.Init();
-    /*DynamicArray<HalfEdge> edgesForward;
-    edgesForward.Init();
-    DynamicArray<HalfEdge> edgesBackward;
-    edgesBackward.Init();*/
     DynamicArray<Face> faces;
     faces.Init();
 
@@ -120,8 +116,8 @@ HalfEdgeMesh HalfEdgeMeshFromObj(const char* filePath)
         if (faceInds.data[i + 1] == -1) {
             he.next = halfEdges.size - faceVerts;
         }
-        auto edgeBackward = edgeMap.find(backward);
-        if (edgeBackward != edgeMap.end()) {
+        auto edgeBackward = mesh.edgeMap->find(backward);
+        if (edgeBackward != mesh.edgeMap->end()) {
             he.twin = edgeBackward->second;
             halfEdges.data[edgeBackward->second].twin = halfEdges.size;
             printf("Connected twins: %d and %d\n",
@@ -137,7 +133,8 @@ HalfEdgeMesh HalfEdgeMeshFromObj(const char* filePath)
         vertices.data[vertSrc].halfEdge = halfEdges.size;
 
         // Add edge to edgeMap and halfEdges array
-        auto res = edgeMap.insert(std::make_pair(forward, halfEdges.size));
+        auto res = mesh.edgeMap->insert(
+            std::make_pair(forward, halfEdges.size));
         if (!res.second) {
             printf("ERROR: Edge already in edgeMap\n");
         }
@@ -184,36 +181,69 @@ HalfEdgeMesh HalfEdgeMeshFromObj(const char* filePath)
     return mesh;
 }
 
+// Make a new edge v1 -> v2, splitting face f.
+// f will now be v1 -> ... -> v2 -> v1
+// new face will be v2 -> ... -> v1 -> v2
+void SplitFaceMakeEdge(const HalfEdgeMesh& mesh,
+    uint32 f, uint32 v1, uint32 v2)
+{
+    uint32 edge = mesh.faces[f].halfEdge;
+    uint32 eToV1 = edge;
+    // Search until e is the edge that points to v1.
+    do {
+        eToV1 = mesh.halfEdges[eToV1].next;
+    } while (mesh.halfEdges[eToV1].vertex != v1);
+
+    // uint32 e = mesh.halfEdges[];
+}
+
+void FreeHalfEdgeMesh(const HalfEdgeMesh& mesh)
+{
+    free(mesh.vertices);
+    free(mesh.faces);
+    free(mesh.halfEdges);
+    delete mesh.edgeMap;
+}
+
 HalfEdgeMeshGL LoadHalfEdgeMeshGL(const HalfEdgeMesh& mesh)
 {
     HalfEdgeMeshGL meshGL = {};
 
-    /*TexturedRectGL texturedRectGL;
-    // TODO probably use indexing for this
-    const GLfloat vertices[] = {
-        0.0f, 0.0f, 0.0f,
-        1.0f, 0.0f, 0.0f,
-        1.0f, 1.0f, 0.0f,
-        1.0f, 1.0f, 0.0f,
-        0.0f, 1.0f, 0.0f,
-        0.0f, 0.0f, 0.0f
-    };
-    const GLfloat uvs[] = {
-        0.0f, 0.0f,
-        1.0f, 0.0f,
-        1.0f, 1.0f,
-        1.0f, 1.0f,
-        0.0f, 1.0f,
-        0.0f, 0.0f
-    };
+    // TODO use indexing for this
+    DynamicArray<Vec3> vertices;
+    vertices.Init();
 
-    glGenVertexArrays(1, &texturedRectGL.vertexArray);
-    glBindVertexArray(texturedRectGL.vertexArray);
+    for (uint32 i = 0; i < mesh.numFaces; i++) {
+        uint32 numEdges = 0;
+        uint32 edge = mesh.faces[i].halfEdge;
+        uint32 e = edge;
+        do {
+            numEdges++;
+            e = mesh.halfEdges[e].next;
+        } while (e != edge);
 
-    glGenBuffers(1, &texturedRectGL.vertexBuffer);
-    glBindBuffer(GL_ARRAY_BUFFER, texturedRectGL.vertexBuffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices,
-        GL_STATIC_DRAW);
+        if (numEdges == 3) {
+            do {
+                vertices.Append(mesh.vertices[mesh.halfEdges[e].vertex].pos);
+                e = mesh.halfEdges[e].next;
+            } while (e != edge);
+        }
+        else if (numEdges == 4) {
+            printf("4 edges in face, split\n");
+        }
+        else {
+            // TODO error
+            printf("ERROR: Unsupported %d-edge face\n", numEdges);
+        }
+    }
+
+    glGenVertexArrays(1, &meshGL.vertexArray);
+    glBindVertexArray(meshGL.vertexArray);
+
+    glGenBuffers(1, &meshGL.vertexBuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, meshGL.vertexBuffer);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size * sizeof(Vec3),
+        vertices.data, GL_STATIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(
         0, // match shader layout location
@@ -224,26 +254,11 @@ HalfEdgeMeshGL LoadHalfEdgeMeshGL(const HalfEdgeMesh& mesh)
         (void*)0 // array buffer offset
     );
 
-    glGenBuffers(1, &texturedRectGL.uvBuffer);
-    glBindBuffer(GL_ARRAY_BUFFER, texturedRectGL.uvBuffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(uvs), uvs, GL_STATIC_DRAW);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(
-        1, // match shader layout location
-        2, // size (vec2)
-        GL_FLOAT, // type
-        GL_FALSE, // normalized?
-        0, // stride
-        (void*)0 // array buffer offset
-    );
-
     glBindVertexArray(0);
 
-    texturedRectGL.programID = LoadShaders(
-        "shaders/texturedRect.vert",
-        "shaders/texturedRect.frag");
-    
-    return texturedRectGL;*/
+    meshGL.programID = LoadShaders(
+        "shaders/model.vert",
+        "shaders/model.frag");
 
     return meshGL;
 }

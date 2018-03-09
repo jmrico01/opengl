@@ -167,7 +167,7 @@ def LinuxCompileDebug():
     ])
 
     compileCommand = " ".join([
-        "gcc",
+        "g++",
         compilerFlags, compilerWarningFlags, includePaths,
         paths["main-cpp"], "-o prince",
         libPaths, libs
