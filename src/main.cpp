@@ -19,6 +19,7 @@
 #include "text.h"
 #include "gui.h"
 #include "load_bmp.h"
+#include "halfedge.h"
 
 // TODO (on linux at least) the window's top bar is part
 // of the viewport, so the render scene is cropped.
@@ -260,10 +261,10 @@ int main(int argc, char* argv[])
     FontFace cmSerifBold128 = LoadFontFace(
         library, "data/fonts/computer-modern/serif-bold.ttf", 128);
 
-    int numBoxes = 1;
-    ClickableBox boxes[1];
-    int numFields = 3;
-    InputField fields[3];
+    const int numBoxes = 1;
+    ClickableBox boxes[numBoxes];
+    const int numFields = 3;
+    InputField fields[numFields];
     {
         Vec2 guiBoxOrigin = { 100.0f, 100.0f };
         Vec2 guiBoxSize = { 100.0f, 80.0f };
@@ -275,6 +276,11 @@ int main(int argc, char* argv[])
         fields[1] = CreateInputField(fieldOrigin, fieldSize);
         fieldOrigin = { 250.0f, 300.0f };
         fields[2] = CreateInputField(fieldOrigin, fieldSize);
+    }
+
+    HalfEdgeMesh mesh = HalfEdgeMeshFromObj("data/models/cube.obj");
+    if (!mesh.vertices) {
+        printf("not loaded\n");
     }
 
     glfwSetFramebufferSizeCallback(window, FramebufferSizeCallback);
@@ -375,10 +381,12 @@ int main(int argc, char* argv[])
     return 0;
 }
 
+#include "km_lib.cpp"
 #include "ogl_base.cpp"
 #include "text.cpp"
 #include "load_bmp.cpp"
 #include "gui.cpp"
+#include "halfedge.cpp"
 
 #include "glew.c"
 //#undef internal

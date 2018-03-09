@@ -50,7 +50,7 @@ void DrawClickableBoxes(ClickableBox boxes[], uint32 n, RectGL rectGL)
 {
     for (uint32 i = 0; i < n; i++) {
         Vec3 pos = { boxes[i].origin.x, boxes[i].origin.y, 0.0f };
-        Vec4 color = { 0.1f, 0.3f, 0.5f, 1.0f };
+        Vec4 color = { 1.0f, 1.0f, 1.0f, 1.0f };
         if (boxes[i].hovered) {
             color.a = 0.5f;
             // TODO custom callback or something?
