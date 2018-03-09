@@ -291,6 +291,8 @@ int main(int argc, char* argv[])
 
     glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
 
+    
+
     while (!glfwWindowShouldClose(window)) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 

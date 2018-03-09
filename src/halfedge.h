@@ -5,19 +5,18 @@
 struct HalfEdge;
 
 struct Vertex {
-    Vec3 position;
-    HalfEdge* halfEdge;
+    Vec3 pos;
+    uint32 halfEdge;
 };
 
 struct Face {
-    HalfEdge* halfEdge;
+    uint32 halfEdge;
 };
 
 struct HalfEdge {
-    HalfEdge* next;
-    HalfEdge* twin;
-    Vertex* vertex;
-    Face* face;
+    uint32 next;
+    uint32 vertex;
+    uint32 face;
 };
 
 struct HalfEdgeMesh {
@@ -26,7 +25,8 @@ struct HalfEdgeMesh {
     uint32 numFaces;
     Face* faces;
     uint32 numEdges;
-    HalfEdge* halfEdges;
+    HalfEdge* edgesForward;
+    HalfEdge* edgesBackward;
 };
 
 HalfEdgeMesh HalfEdgeMeshFromObj(const char* filePath);
