@@ -5,6 +5,13 @@
 // TODO get rid of this
 #define PATH_MAX_LENGTH 512
 
+#define KEY_INPUT_BUFFER_MAX 256
+
+struct KeyEvent {
+    char ascii;
+    bool pressed;
+};
+
 struct ReadFileResult
 {
     uint64 size;

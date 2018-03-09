@@ -2,9 +2,10 @@
 
 #include "km_math.h"
 #include "ogl_base.h"
+#include "main.h"
 #include "text.h"
 
-#define INPUT_BUFFER_SIZE 512
+#define INPUT_BUFFER_SIZE 128
 
 enum ClickStateFlags {
     CLICKSTATE_NONE = 0,
@@ -31,6 +32,7 @@ struct InputField
 {
     ClickableBox box;
     char text[INPUT_BUFFER_SIZE];
+    uint32 textLen;
 };
 
 ClickableBox CreateClickableBox(Vec2 origin, Vec2 size);
@@ -41,6 +43,6 @@ void UpdateClickableBoxes(ClickableBox boxes[], uint32 n,
 void DrawClickableBoxes(ClickableBox boxes[], uint32 n, RectGL rectGL);
 
 void UpdateInputFields(InputField fields[], uint32 n,
-    Vec2 mousePos, int clickState);
+    Vec2 mousePos, int clickState, KeyEvent* keyBuf, uint32 keyBufSize);
 void DrawInputFields(InputField fields[], uint32 n,
     RectGL rectGL, TextGL textGL, const FontFace& face);

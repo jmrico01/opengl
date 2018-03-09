@@ -29,6 +29,9 @@ global_var int width_ = 1024;
 global_var int height_ = 768;
 global_var int clickState_ = CLICKSTATE_NONE;
 
+global_var KeyEvent keyInputBuffer[KEY_INPUT_BUFFER_MAX];
+global_var uint32 keyInputBufferSize = 0;
+
 internal void RemoveFileNameFromPath(
     char* filePath, char* dest, uint64 destLength)
 {
@@ -59,23 +62,47 @@ internal void ErrorCallback(int err, const char* msg)
     printf("GLFW error code %d: %s\n", err, msg);
 }
 
+// NOTE: for now, I'm assuming input callbacks occur on the same thread
+// as the main loop. have to research that.
+internal void CharModsCallback(GLFWwindow* window,
+    uint32 codepoint, int mods)
+{
+    printf("char callback: %d\n", codepoint);
+    KeyEvent keyEvent = {
+        (char)codepoint,
+        true
+    };
+
+    keyInputBuffer[keyInputBufferSize++] = keyEvent;
+}
 internal void KeyCallback(GLFWwindow* window,
     int key, int scancode, int action, int mods)
 {
     if (key == GLFW_KEY_ESCAPE) {
         if (action == GLFW_PRESS) {
             // TODO exit
+            printf("TODO: ESC detected, application should exit...");
         }
     }
 
-    if (action == GLFW_PRESS) {
-        printf("pressed:  %d\n", key);
-    }
-    else if (action == GLFW_RELEASE) {
-        printf("released: %d\n", key);
+    if (key == GLFW_KEY_BACKSPACE) {
+        KeyEvent keyEvent;
+        keyEvent.ascii = 8;
+        if (action == GLFW_PRESS) {
+            printf("backspace press\n");
+            keyEvent.pressed = true;
+        }
+        else if (action == GLFW_RELEASE) {
+            printf("backspace release\n");
+            keyEvent.pressed = false;
+        }
+        else {
+            return;
+        }
+
+        keyInputBuffer[keyInputBufferSize++] = keyEvent;
     }
 }
-
 internal void MouseCallback(GLFWwindow* window,
     int button, int action, int mods)
 {
@@ -233,8 +260,10 @@ int main(int argc, char* argv[])
     FontFace cmSerifBold128 = LoadFontFace(
         library, "data/fonts/computer-modern/serif-bold.ttf", 128);
 
+    int numBoxes = 1;
     ClickableBox boxes[1];
-    InputField fields[1];
+    int numFields = 3;
+    InputField fields[3];
     {
         Vec2 guiBoxOrigin = { 100.0f, 100.0f };
         Vec2 guiBoxSize = { 100.0f, 80.0f };
@@ -242,10 +271,15 @@ int main(int argc, char* argv[])
         Vec2 fieldOrigin = { 250.0f, 100.0f };
         Vec2 fieldSize = { 400.0f, 32.0f };
         fields[0] = CreateInputField(fieldOrigin, fieldSize);
+        fieldOrigin = { 250.0f, 200.0f };
+        fields[1] = CreateInputField(fieldOrigin, fieldSize);
+        fieldOrigin = { 250.0f, 300.0f };
+        fields[2] = CreateInputField(fieldOrigin, fieldSize);
     }
 
     glfwSetFramebufferSizeCallback(window, FramebufferSizeCallback);
     // Set up input handling.
+    glfwSetCharModsCallback(window, &CharModsCallback);
     glfwSetKeyCallback(window, &KeyCallback);
     glfwSetMouseButtonCallback(window, &MouseCallback);
 
@@ -323,11 +357,15 @@ int main(int argc, char* argv[])
             mouseY = (double)height_ - mouseY;
             Vec2 mousePos = { (float)mouseX, (float)mouseY };
 
-            UpdateClickableBoxes(boxes, 1, mousePos, clickState_);
-            UpdateInputFields(fields, 1, mousePos, clickState_);
-            DrawClickableBoxes(boxes, 1, rectGL);
-            DrawInputFields(fields, 1, rectGL, textGL, cmSerif);
+            UpdateClickableBoxes(boxes, numBoxes, mousePos, clickState_);
+            UpdateInputFields(fields, numFields, mousePos, clickState_,
+                keyInputBuffer, keyInputBufferSize);
+            DrawClickableBoxes(boxes, numBoxes, rectGL);
+            DrawInputFields(fields, numFields, rectGL, textGL, cmSerif);
         }
+
+        // Clear all key events
+        keyInputBufferSize = 0;
 
         glfwSwapBuffers(window);
         glfwWaitEvents();
