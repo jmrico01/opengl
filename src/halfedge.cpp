@@ -186,7 +186,7 @@ HalfEdgeMesh HalfEdgeMeshFromObj(const char* filePath)
 
 HalfEdgeMeshGL LoadHalfEdgeMeshGL(const HalfEdgeMesh& mesh)
 {
-    HalfEdgeMeshGL meshGL;
+    HalfEdgeMeshGL meshGL = {};
 
     /*TexturedRectGL texturedRectGL;
     // TODO probably use indexing for this

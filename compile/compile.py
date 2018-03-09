@@ -131,8 +131,7 @@ def LinuxCompileDebug():
         "-Wall",    # enable all warnings
 
         # disable the following warnings:
-        "-Wno-char-subscripts", # using char as an array subscript
-        "-Wno-missing-braces"  # Mac thing
+        "-Wno-char-subscripts" # using char as an array subscript
     ])
     includePaths = " ".join([
         "-I" + paths["include-glew"],
@@ -161,6 +160,57 @@ def LinuxCompileDebug():
         "-lXinerama",
         "-lpthread",
         "-ldl",
+
+        # FreeType dependencies
+        "-lz",
+        "-lpng"
+    ])
+
+    compileCommand = " ".join([
+        "gcc",
+        compilerFlags, compilerWarningFlags, includePaths,
+        paths["main-cpp"], "-o prince",
+        libPaths, libs
+    ])
+
+    os.system("bash -c \"" + " ; ".join([
+        "pushd " + paths["build"] + " > /dev/null",
+        compileCommand,
+        "popd > /dev/null"
+    ]) + "\"")
+
+def MacCompileDebug():
+    compilerFlags = " ".join([
+        "-std=c++11",       # use C++11 standard
+        "-ggdb3",           # generate level 3 (max) GDB debug info.
+        "-fno-rtti",        # disable run-time type info
+        "-fno-exceptions"   # disable C++ exceptions (ew)
+    ])
+    compilerWarningFlags = " ".join([
+        "-Werror",  # treat warnings as errors
+        "-Wall",    # enable all warnings
+
+        # disable the following warnings:
+        "-Wno-missing-braces"  # Not sure why this complains
+    ])
+    includePaths = " ".join([
+        "-I" + paths["include-glew"],
+        "-I" + paths["include-glfw"],
+        "-I" + paths["include-freetype"],
+        "-I" + paths["include-lodepng"]
+    ])
+
+    libPaths = " ".join([
+        "-L" + paths["lib-glfw-linux"],
+        "-L" + paths["lib-ft-linux"]
+    ])
+    libs = " ".join([
+        # main external libs
+        "-lglfw3",
+        "-lfreetype",
+
+        # GLFW3 dependencies
+        "-framework OpenGL",
 
         # FreeType dependencies
         "-lz",
