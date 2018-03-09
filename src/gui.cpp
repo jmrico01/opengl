@@ -96,9 +96,8 @@ void UpdateInputFields(InputField fields[], uint32 n,
 
             if (keyBuf[i].ascii == 8) {
                 printf(">> backspaced\n");
-                fields[focus].textLen--;
-                if (fields[focus].textLen < 0) {
-                    fields[focus].textLen = 0;
+                if (fields[focus].textLen > 0) {
+                    fields[focus].textLen--;
                 }
             }
             else if (fields[focus].textLen < INPUT_BUFFER_SIZE - 1) {

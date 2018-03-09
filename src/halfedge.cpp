@@ -67,7 +67,6 @@ HalfEdgeMesh HalfEdgeMeshFromObj(const char* filePath)
         }
         else if (line[0] == 'f') {
             char* el = &line[2];
-            int i = 0;
             for (char* c = &line[2]; *c != '\0'; c++) {
                 if (*c == ' ' || *c == '\n') {
                     char* endptr = el;

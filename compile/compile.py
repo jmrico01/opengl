@@ -131,7 +131,8 @@ def LinuxCompileDebug():
         "-Wall",    # enable all warnings
 
         # disable the following warnings:
-        "-Wno-char-subscripts"  # using char as an array subscript
+        "-Wno-char-subscripts", # using char as an array subscript
+        "-Wno-missing-braces"  # Mac thing
     ])
     includePaths = " ".join([
         "-I" + paths["include-glew"],
