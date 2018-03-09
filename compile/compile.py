@@ -220,6 +220,7 @@ def Debug():
     elif platformName == "Linux":
         LinuxCompileDebug()
     else:
+        LinuxCompileDebug()
         print "Unsupported platform: " + platformName
         
 

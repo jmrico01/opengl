@@ -1,6 +1,7 @@
 #include "halfedge.h"
 
 #include <stdio.h>
+#include <map>
 
 #include "main.h"
 #include "km_lib.h"
@@ -83,10 +84,13 @@ HalfEdgeMesh HalfEdgeMeshFromObj(const char* filePath)
         }
     }
 
-    DynamicArray<HalfEdge> edgesForward;
+    std::map<std::pair<uint32, uint32>, uint32> edgeMap;
+    DynamicArray<HalfEdge> halfEdges;
+    halfEdges.Init();
+    /*DynamicArray<HalfEdge> edgesForward;
     edgesForward.Init();
     DynamicArray<HalfEdge> edgesBackward;
-    edgesBackward.Init();
+    edgesBackward.Init();*/
     DynamicArray<Face> faces;
     faces.Init();
 
@@ -95,54 +99,60 @@ HalfEdgeMesh HalfEdgeMeshFromObj(const char* filePath)
         if (faceInds.data[i] == -1 || i == faceInds.size - 1) {
             // Create face
             Face face;
-            face.halfEdge = edgesForward.size - 1;
+            face.halfEdge = halfEdges.size - 1;
             faces.Append(face);
-
-            // Connect edge "next" endpoints
-            edgesForward.data[edgesForward.size - 1].next =
-                edgesForward.size - faceVerts;
-            edgesForward.data[edgesForward.size - 1].vertex =
-                faceInds.data[i - faceVerts];
-            edgesBackward.data[edgesBackward.size - faceVerts].next =
-                edgesBackward.size - 1;
             
             faceVerts = 0;
             continue;
         }
 
-        // Assign forward edge i -> i + 1 to vertex i
-        vertices.data[faceInds.data[i] - 1].halfEdge = edgesForward.size;
+        uint32 vertSrc = faceInds.data[i] - 1;
+        uint32 vertDst = faceInds.data[i + 1] - 1;
+        if (faceInds.data[i + 1] == -1) {
+            vertDst = faceInds.data[i - faceVerts] - 1;
+        }
 
-        // Create forward edge, i -> i + 1
+        // Create edge, i -> i + 1
         // Last edge will have wrong "next"
-        HalfEdge forward;
-        forward.next = edgesForward.size + 1;
-        forward.vertex = faceInds.data[i + 1] - 1;
-        forward.face = faces.size;
+        std::pair<int, int> forward(vertSrc, vertDst);
+        std::pair<int, int> backward(vertDst, vertSrc);
+        HalfEdge he;
+        he.next = halfEdges.size + 1;
+        if (faceInds.data[i + 1] == -1) {
+            he.next = halfEdges.size - faceVerts;
+        }
+        auto edgeBackward = edgeMap.find(backward);
+        if (edgeBackward != edgeMap.end()) {
+            he.twin = edgeBackward->second;
+            halfEdges.data[edgeBackward->second].twin = halfEdges.size;
+            printf("Connected twins: %d and %d\n",
+                edgeBackward->second, halfEdges.size);
+        }
+        else {
+            he.twin = 0;
+        }
+        he.vertex = vertDst;
+        he.face = faces.size;
 
-        // Create backward edge, i + 1 -> i
-        // First edge will have wrong "next"
-        HalfEdge backward;
-        backward.next = edgesBackward.size - 1;
-        backward.vertex = faceInds.data[i] - 1;
-        backward.face = faces.size;
+        // Assign forward edge i -> i + 1 to vertex i
+        vertices.data[vertSrc].halfEdge = halfEdges.size;
 
-        edgesForward.Append(forward);
-        edgesBackward.Append(backward);
+        // Add edge to edgeMap and halfEdges array
+        auto res = edgeMap.insert(std::make_pair(forward, halfEdges.size));
+        if (!res.second) {
+            printf("ERROR: Edge already in edgeMap\n");
+        }
+        printf("mapped (%d, %d) -> %d\n", forward.first, forward.second,
+            halfEdges.size);
+        halfEdges.Append(he);
         faceVerts++;
-    }
-
-    if (edgesForward.size != edgesBackward.size) {
-        printf("ERROR: should be an assert\n");
-        // TODO assert
     }
 
     mesh.numVertices = vertices.size;
     mesh.vertices = vertices.data;
 
-    mesh.numEdges = edgesForward.size;
-    mesh.edgesForward = edgesForward.data;
-    mesh.edgesBackward = edgesBackward.data;
+    mesh.numHalfEdges = halfEdges.size;
+    mesh.halfEdges = halfEdges.data;
 
     mesh.numFaces = faces.size;
     mesh.faces = faces.data;
@@ -156,21 +166,13 @@ HalfEdgeMesh HalfEdgeMeshFromObj(const char* filePath)
             mesh.vertices[i].pos.z,
             mesh.vertices[i].halfEdge);
     }
-    printf("----- FORWARD EDGES -----\n");
-    for (uint32 i = 0; i < mesh.numEdges; i++) {
-        printf("%d: next %d, vert %d, face %d\n",
+    printf("----- HALF EDGES -----\n");
+    for (uint32 i = 0; i < mesh.numHalfEdges; i++) {
+        printf("%d: next %d, twin: %d, vert %d, face %d\n",
             i,
-            mesh.edgesForward[i].next,
-            mesh.edgesForward[i].vertex,
-            mesh.edgesForward[i].face);
-    }
-    printf("----- BACKWARD EDGES -----\n");
-    for (uint32 i = 0; i < mesh.numEdges; i++) {
-        printf("%d: next %d, vert %d, face %d\n",
-            i,
-            mesh.edgesBackward[i].next,
-            mesh.edgesBackward[i].vertex,
-            mesh.edgesBackward[i].face);
+            mesh.halfEdges[i].next, mesh.halfEdges[i].twin,
+            mesh.halfEdges[i].vertex,
+            mesh.halfEdges[i].face);
     }
     printf("----- FACES -----\n");
     for (uint32 i = 0; i < mesh.numFaces; i++) {
@@ -181,4 +183,72 @@ HalfEdgeMesh HalfEdgeMeshFromObj(const char* filePath)
 
     // TODO free mesh after this
     return mesh;
+}
+
+HalfEdgeMeshGL LoadHalfEdgeMeshGL(const HalfEdgeMesh& mesh)
+{
+    HalfEdgeMeshGL meshGL;
+
+    /*TexturedRectGL texturedRectGL;
+    // TODO probably use indexing for this
+    const GLfloat vertices[] = {
+        0.0f, 0.0f, 0.0f,
+        1.0f, 0.0f, 0.0f,
+        1.0f, 1.0f, 0.0f,
+        1.0f, 1.0f, 0.0f,
+        0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f
+    };
+    const GLfloat uvs[] = {
+        0.0f, 0.0f,
+        1.0f, 0.0f,
+        1.0f, 1.0f,
+        1.0f, 1.0f,
+        0.0f, 1.0f,
+        0.0f, 0.0f
+    };
+
+    glGenVertexArrays(1, &texturedRectGL.vertexArray);
+    glBindVertexArray(texturedRectGL.vertexArray);
+
+    glGenBuffers(1, &texturedRectGL.vertexBuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, texturedRectGL.vertexBuffer);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices,
+        GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(
+        0, // match shader layout location
+        3, // size (vec3)
+        GL_FLOAT, // type
+        GL_FALSE, // normalized?
+        0, // stride
+        (void*)0 // array buffer offset
+    );
+
+    glGenBuffers(1, &texturedRectGL.uvBuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, texturedRectGL.uvBuffer);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(uvs), uvs, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(
+        1, // match shader layout location
+        2, // size (vec2)
+        GL_FLOAT, // type
+        GL_FALSE, // normalized?
+        0, // stride
+        (void*)0 // array buffer offset
+    );
+
+    glBindVertexArray(0);
+
+    texturedRectGL.programID = LoadShaders(
+        "shaders/texturedRect.vert",
+        "shaders/texturedRect.frag");
+    
+    return texturedRectGL;*/
+
+    return meshGL;
+}
+
+void FreeHalfEdgeMeshGL(const HalfEdgeMeshGL& meshGL)
+{
 }

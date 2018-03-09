@@ -4,6 +4,8 @@
 
 #define DYNAMIC_ARRAY_START_SIZE 10
 
+#define HASH_MAP_START_SIZE 10
+
 template <typename T>
 void DynamicArray<T>::Init()
 {
