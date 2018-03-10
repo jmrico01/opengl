@@ -335,4 +335,5 @@ void DrawHalfEdgeMeshGL(const HalfEdgeMeshGL& meshGL)
     glBindVertexArray(meshGL.vertexArray);
     glDrawArrays(GL_TRIANGLES, 0, meshGL.vertexCount);
     glBindVertexArray(0);
+    
 }
