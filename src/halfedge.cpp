@@ -169,43 +169,50 @@ HalfEdgeMesh HalfEdgeMeshFromObj(const char* filePath)
 // Make a new edge v1 -> v2, splitting face f.
 // f will now be v1 -> ... -> v2 -> v1
 // new face will be v2 -> ... -> v1 -> v2
-void SplitFaceMakeEdge(const HalfEdgeMesh& mesh,
-    uint32 f, uint32 v1, uint32 v2)
+void SplitFaceMakeEdge(HalfEdgeMesh* mesh, uint32 f, uint32 v1, uint32 v2)
 {
-    uint32 edge = mesh.faces[f].halfEdge;
+    uint32 edge = mesh->faces[f].halfEdge;
     uint32 eToV1 = edge;
-    while (mesh.halfEdges[eToV1].vertex != v1) {
-        eToV1 = mesh.halfEdges[eToV1].next;
+    while (mesh->halfEdges[eToV1].vertex != v1) {
+        eToV1 = mesh->halfEdges[eToV1].next;
     }
     uint32 eToV2 = edge;
-    while (mesh.halfEdges[eToV2].vertex != v2) {
-        eToV2 = mesh.halfEdges[eToV2].next;
+    while (mesh->halfEdges[eToV2].vertex != v2) {
+        eToV2 = mesh->halfEdges[eToV2].next;
     }
 
     uint32 e = eToV2;
-    while (mesh.halfEdges[e].vertex != v1) {
-        e = mesh.halfEdges[e].next;
+    while (mesh->halfEdges[e].vertex != v1) {
+        e = mesh->halfEdges[e].next;
         // Assign new face to edges v2 -> ... -> v1
-        mesh.halfEdges[e].face = mesh.faces.size;
+        mesh->halfEdges[e].face = mesh->faces.size;
     }
 
     // Update original face f
-    mesh.faces[f].halfEdge = mesh.halfEdges.size + 1; // v2 -> v1
+    mesh->faces[f].halfEdge = mesh->halfEdges.size + 1; // v2 -> v1
     // Create new face
     Face newFace;
-    newFace.halfEdge = mesh.halfEdges.size; // v1 -> v2
+    newFace.halfEdge = mesh->halfEdges.size; // v1 -> v2
 
     // Create new half edges
     HalfEdge v1v2;
-    v1v2.next = mesh.halfEdges[eToV2].next;
-    v1v2.twin = mesh.halfEdges.size + 1;
+    v1v2.next = mesh->halfEdges[eToV2].next;
+    v1v2.twin = mesh->halfEdges.size + 1;
     v1v2.vertex = v2;
-    v1v2.face = mesh.faces.size;
+    v1v2.face = mesh->faces.size;
     HalfEdge v2v1;
-    v2v1.next = mesh.halfEdges[eToV1].next;
-    v2v1.twin = mesh.halfEdges.size;
+    v2v1.next = mesh->halfEdges[eToV1].next;
+    v2v1.twin = mesh->halfEdges.size;
     v2v1.vertex = v1;
     v2v1.face = f;
+
+    mesh->halfEdges.Append(v1v2);
+    mesh->halfEdges.Append(v2v1);
+    mesh->faces.Append(newFace);
+}
+
+void Triangulate(HalfEdgeMesh* mesh)
+{
 }
 
 void FreeHalfEdgeMesh(HalfEdgeMesh* mesh)

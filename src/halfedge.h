@@ -38,8 +38,9 @@ struct HalfEdgeMeshGL
 };
 
 HalfEdgeMesh HalfEdgeMeshFromObj(const char* filePath);
-void SplitFaceMakeEdge(const HalfEdgeMesh& mesh);
-void FreeHalfEdgeMesh(const HalfEdgeMesh& mesh);
+void SplitFaceMakeEdge(HalfEdgeMesh* mesh, uint32 f, uint32 v1, uint32 v2);
+void Triangulate(HalfEdgeMesh* mesh);
+void FreeHalfEdgeMesh(HalfEdgeMesh* mesh);
 
 HalfEdgeMeshGL LoadHalfEdgeMeshGL(const HalfEdgeMesh& mesh);
 void FreeHalfEdgeMeshGL(const HalfEdgeMeshGL& meshGL);
