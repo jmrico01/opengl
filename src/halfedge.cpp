@@ -136,34 +136,21 @@ HalfEdgeMesh HalfEdgeMeshFromObj(const char* filePath)
         faceVerts++;
     }
 
-    printf("----- VERTICES -----\n");
-    for (uint32 i = 0; i < mesh.vertices.size; i++) {
-        printf("%d: (%f, %f, %f) ; edge %d\n",
-            i,
-            mesh.vertices[i].pos.x,
-            mesh.vertices[i].pos.y,
-            mesh.vertices[i].pos.z,
-            mesh.vertices[i].halfEdge);
-    }
-    printf("----- HALF EDGES -----\n");
-    for (uint32 i = 0; i < mesh.halfEdges.size; i++) {
-        printf("%d: next %d, twin: %d, vert %d, face %d\n",
-            i,
-            mesh.halfEdges[i].next, mesh.halfEdges[i].twin,
-            mesh.halfEdges[i].vertex,
-            mesh.halfEdges[i].face);
-    }
-    printf("----- FACES -----\n");
-    for (uint32 i = 0; i < mesh.faces.size; i++) {
-        printf("%d: edge %d\n",
-            i,
-            mesh.faces[i].halfEdge);
-    }
-
     faceInds.Free();
+    PrintHalfEdgeMesh(mesh);
 
     // TODO free mesh after this
     return mesh;
+}
+
+HalfEdgeMesh CopyHalfEdgeMesh(const HalfEdgeMesh* mesh)
+{
+    HalfEdgeMesh newMesh;
+    newMesh.vertices = mesh->vertices.Copy();
+    newMesh.faces = mesh->faces.Copy();
+    newMesh.halfEdges = mesh->halfEdges.Copy();
+
+    return newMesh;
 }
 
 // Make a new edge v1 -> v2, splitting face f.
@@ -206,6 +193,10 @@ void SplitFaceMakeEdge(HalfEdgeMesh* mesh, uint32 f, uint32 v1, uint32 v2)
     v2v1.vertex = v1;
     v2v1.face = f;
 
+    // Connect endpoints to new half edges
+    mesh->halfEdges[eToV1].next = mesh->halfEdges.size;
+    mesh->halfEdges[eToV2].next = mesh->halfEdges.size + 1;
+
     mesh->halfEdges.Append(v1v2);
     mesh->halfEdges.Append(v2v1);
     mesh->faces.Append(newFace);
@@ -213,6 +204,31 @@ void SplitFaceMakeEdge(HalfEdgeMesh* mesh, uint32 f, uint32 v1, uint32 v2)
 
 void Triangulate(HalfEdgeMesh* mesh)
 {
+    for (uint32 i = 0; i < mesh->faces.size; i++) {
+        while (true) {
+            uint32 numEdges = 0;
+            uint32 edge = mesh->faces[i].halfEdge;
+            uint32 e = edge;
+            uint32 ePrev = e;
+            do {
+                numEdges++;
+                if (numEdges > 3) {
+                    SplitFaceMakeEdge(mesh, i, mesh->halfEdges[ePrev].vertex,
+                        mesh->halfEdges[edge].vertex);
+                    break;
+                }
+                ePrev = e;
+                e = mesh->halfEdges[e].next;
+            } while (e != edge);
+
+            if (numEdges == 3) {
+                break;
+            }
+        }
+    }
+
+    printf("==> TRIANGULATION FINISHED\n");
+    PrintHalfEdgeMesh((const HalfEdgeMesh&)*mesh);
 }
 
 void FreeHalfEdgeMesh(HalfEdgeMesh* mesh)
@@ -222,36 +238,51 @@ void FreeHalfEdgeMesh(HalfEdgeMesh* mesh)
     mesh->halfEdges.Free();
 }
 
+void PrintHalfEdgeMesh(const HalfEdgeMesh& mesh)
+{
+    printf("----- VERTICES -----\n");
+    for (uint32 i = 0; i < mesh.vertices.size; i++) {
+        printf("%d: (%f, %f, %f) ; edge %d\n",
+            i,
+            mesh.vertices[i].pos.x,
+            mesh.vertices[i].pos.y,
+            mesh.vertices[i].pos.z,
+            mesh.vertices[i].halfEdge);
+    }
+    printf("----- HALF EDGES -----\n");
+    for (uint32 i = 0; i < mesh.halfEdges.size; i++) {
+        printf("%d: next %d, twin: %d, vert %d, face %d\n",
+            i,
+            mesh.halfEdges[i].next, mesh.halfEdges[i].twin,
+            mesh.halfEdges[i].vertex,
+            mesh.halfEdges[i].face);
+    }
+    printf("----- FACES -----\n");
+    for (uint32 i = 0; i < mesh.faces.size; i++) {
+        printf("%d: edge %d\n",
+            i,
+            mesh.faces[i].halfEdge);
+    }
+}
+
 HalfEdgeMeshGL LoadHalfEdgeMeshGL(const HalfEdgeMesh& mesh)
 {
+    HalfEdgeMesh meshTri = CopyHalfEdgeMesh(&mesh);
+    Triangulate(&meshTri);
     HalfEdgeMeshGL meshGL = {};
 
     // TODO use indexing for this
     DynamicArray<Vec3> vertices;
     vertices.Init();
 
-    for (uint32 i = 0; i < mesh.faces.size; i++) {
+    for (uint32 i = 0; i < meshTri.faces.size; i++) {
         uint32 numEdges = 0;
-        uint32 edge = mesh.faces[i].halfEdge;
+        uint32 edge = meshTri.faces[i].halfEdge;
         uint32 e = edge;
         do {
-            numEdges++;
-            e = mesh.halfEdges[e].next;
+            vertices.Append(meshTri.vertices[meshTri.halfEdges[e].vertex].pos);
+            e = meshTri.halfEdges[e].next;
         } while (e != edge);
-
-        if (numEdges == 3) {
-            do {
-                vertices.Append(mesh.vertices[mesh.halfEdges[e].vertex].pos);
-                e = mesh.halfEdges[e].next;
-            } while (e != edge);
-        }
-        else if (numEdges == 4) {
-            printf("4 edges in face, split\n");
-        }
-        else {
-            // TODO error
-            printf("ERROR: Unsupported %d-edge face\n", numEdges);
-        }
     }
 
     glGenVertexArrays(1, &meshGL.vertexArray);
@@ -277,9 +308,31 @@ HalfEdgeMeshGL LoadHalfEdgeMeshGL(const HalfEdgeMesh& mesh)
         "shaders/model.vert",
         "shaders/model.frag");
 
+    meshGL.vertexCount = (int)vertices.size;
+
     return meshGL;
 }
 
 void FreeHalfEdgeMeshGL(const HalfEdgeMeshGL& meshGL)
 {
+}
+
+void DrawHalfEdgeMeshGL(const HalfEdgeMeshGL& meshGL)
+{
+    //GLint loc;
+    glUseProgram(meshGL.programID);
+    /*pos.x -= anchor.x * size.x;
+    pos.y -= anchor.y * size.y;
+    loc = glGetUniformLocation(rectGL.programID, "posBottomLeft");
+    glUniform3fv(loc, 1, &pos.e[0]);
+    loc = glGetUniformLocation(rectGL.programID, "size");
+    glUniform2fv(loc, 1, &size.e[0]);
+    loc = glGetUniformLocation(rectGL.programID, "color");
+    glUniform4fv(loc, 1, &color.e[0]);
+    loc = glGetUniformLocation(rectGL.programID, "pixelToClip");
+    glUniformMatrix4fv(loc, 1, GL_FALSE, &pixelToClip_.e[0][0]);*/
+
+    glBindVertexArray(meshGL.vertexArray);
+    glDrawArrays(GL_TRIANGLES, 0, meshGL.vertexCount);
+    glBindVertexArray(0);
 }

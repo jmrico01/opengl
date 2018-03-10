@@ -299,6 +299,9 @@ int main(int argc, char* argv[])
     while (!glfwWindowShouldClose(window)) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        DrawHalfEdgeMeshGL(meshGL);
+
+#if 0
         { // Test draws (primitives & text)
             Vec3 kmPos = { 100.0f, 100.0f, 0.0f };
             Vec2 kmSize = { 400.0f, 400.0f };
@@ -374,6 +377,7 @@ int main(int argc, char* argv[])
             DrawClickableBoxes(boxes, numBoxes, rectGL);
             DrawInputFields(fields, numFields, rectGL, textGL, cmSerif);
         }
+#endif
 
         // Clear all key events
         keyInputBufferSize = 0;

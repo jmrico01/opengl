@@ -8,9 +8,11 @@ struct DynamicArray
     T* data;
 
     void Init();
+    DynamicArray<T> Copy() const;
     void Append(T element);
     void Free();
 
+    // TODO make inline
     T& operator[](int index) const {
         return data[index];
     }
