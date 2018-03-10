@@ -242,9 +242,9 @@ int main(int argc, char* argv[])
     ResizeGL(width_, height_);
     // NOTE this isn't like "create a rect instance", but more like
     // "initialize rect drawing in general"
-    RectGL rectGL = CreateRectGL();
+    /*RectGL rectGL = CreateRectGL();
     TexturedRectGL texturedRectGL = CreateTexturedRectGL();
-    TextGL textGL = CreateTextGL();
+    TextGL textGL = CreateTextGL();*/
     
     FT_Library library;
     FT_Error error = FT_Init_FreeType(&library);
@@ -253,13 +253,13 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    GLuint textureKM = OpenGLLoadBMP("data/images/kapricorn.bmp");
+    /*GLuint textureKM = OpenGLLoadBMP("data/images/kapricorn.bmp");
     FontFace cmSerif = LoadFontFace(
         library, "data/fonts/computer-modern/serif.ttf", 32);
     FontFace cmSerifBold = LoadFontFace(
         library, "data/fonts/computer-modern/serif-bold.ttf", 48);
     FontFace cmSerifBold128 = LoadFontFace(
-        library, "data/fonts/computer-modern/serif-bold.ttf", 128);
+        library, "data/fonts/computer-modern/serif-bold.ttf", 128);*/
 
     const int numBoxes = 1;
     ClickableBox boxes[numBoxes];
@@ -296,10 +296,46 @@ int main(int argc, char* argv[])
 
     glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
 
+    Vec3 rotation = Vec3::zero;
+    float zoom = 0.0f;
+
     while (!glfwWindowShouldClose(window)) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        DrawHalfEdgeMeshGL(meshGL);
+        for (uint32 i = 0; i < keyInputBufferSize; i++) {
+            if (!keyInputBuffer[i].pressed) {
+                continue;
+            }
+            const float ZOOM_STEP = 0.8f;
+            const float ROT_STEP = 0.1f;
+
+            if (keyInputBuffer[i].ascii == 'z'
+            || keyInputBuffer[i].ascii == 'Z') {
+                zoom -= ZOOM_STEP;
+            }
+            if (keyInputBuffer[i].ascii == 'x'
+            || keyInputBuffer[i].ascii == 'X') {
+                zoom += ZOOM_STEP;
+            }
+
+            if (keyInputBuffer[i].ascii == 'a'
+            || keyInputBuffer[i].ascii == 'A') {
+                rotation.x -= ROT_STEP;
+            }
+            if (keyInputBuffer[i].ascii == 'd'
+            || keyInputBuffer[i].ascii == 'D') {
+                rotation.x += ROT_STEP;
+            }
+            if (keyInputBuffer[i].ascii == 's'
+            || keyInputBuffer[i].ascii == 'S') {
+                rotation.y -= ROT_STEP;
+            }
+            if (keyInputBuffer[i].ascii == 'w'
+            || keyInputBuffer[i].ascii == 'W') {
+                rotation.y += ROT_STEP;
+            }
+        }
+        DrawHalfEdgeMeshGL(meshGL, zoom, rotation);
 
 #if 0
         { // Test draws (primitives & text)

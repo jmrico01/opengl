@@ -276,7 +276,6 @@ HalfEdgeMeshGL LoadHalfEdgeMeshGL(const HalfEdgeMesh& mesh)
     vertices.Init();
 
     for (uint32 i = 0; i < meshTri.faces.size; i++) {
-        uint32 numEdges = 0;
         uint32 edge = meshTri.faces[i].halfEdge;
         uint32 e = edge;
         do {
@@ -317,20 +316,21 @@ void FreeHalfEdgeMeshGL(const HalfEdgeMeshGL& meshGL)
 {
 }
 
-void DrawHalfEdgeMeshGL(const HalfEdgeMeshGL& meshGL)
+void DrawHalfEdgeMeshGL(const HalfEdgeMeshGL& meshGL,
+    float zoom, Vec3 rotation)
 {
-    //GLint loc;
+    GLint loc;
     glUseProgram(meshGL.programID);
-    /*pos.x -= anchor.x * size.x;
-    pos.y -= anchor.y * size.y;
-    loc = glGetUniformLocation(rectGL.programID, "posBottomLeft");
-    glUniform3fv(loc, 1, &pos.e[0]);
-    loc = glGetUniformLocation(rectGL.programID, "size");
-    glUniform2fv(loc, 1, &size.e[0]);
-    loc = glGetUniformLocation(rectGL.programID, "color");
-    glUniform4fv(loc, 1, &color.e[0]);
-    loc = glGetUniformLocation(rectGL.programID, "pixelToClip");
-    glUniformMatrix4fv(loc, 1, GL_FALSE, &pixelToClip_.e[0][0]);*/
+
+    Vec3 cameraPos = { 0.0f, 0.0f, zoom };
+    Mat4 vp = Translate(-cameraPos); /* * Projection(
+        120.0f, 1.0f,
+        0.1f, 10.0f);*/
+
+    Quat rot = QuatFromEulerAngles(rotation);
+    Mat4 mvp = UnitQuatToMat4(rot) * Scale(Vec3 { 0.2f, 0.2f, 0.2f }) * vp;
+    loc = glGetUniformLocation(meshGL.programID, "mvp");
+    glUniformMatrix4fv(loc, 1, GL_FALSE, &mvp.e[0][0]);
 
     glBindVertexArray(meshGL.vertexArray);
     glDrawArrays(GL_TRIANGLES, 0, meshGL.vertexCount);

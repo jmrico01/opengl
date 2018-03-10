@@ -449,6 +449,29 @@ Mat4 Scale(Vec3 v)
 	return result;
 }
 
+Mat4 Projection(float32 fov, float32 aspect,
+	float32 near, float32 far)
+{
+    float32 degToRad = M_PI / 180.0;
+    float32 yScale = 1.0 / tanf(degToRad * fov / 2);
+    float32 xScale = yScale / aspect;
+    float32 nearmfar = near - far;
+	/*Mat4 proj = {
+        xScale, 0, 0, 0,
+        0, yScale, 0, 0,
+        0, 0, (far + near) / nearmfar, -1.0f,
+        0, 0, 2.0f*far*near / nearmfar, 0 
+    };*/
+	Mat4 proj = {
+        xScale, 0, 0, 0,
+        0, yScale, 0, 0,
+        0, 0, (far + near) / nearmfar, 2.0f*far*near / nearmfar,
+        0, 0, -1.0f, 0 
+    };
+
+	return proj;
+}
+
 // -------------------- Quat --------------------
 const Quat Quat::one = {
     0.0f, 0.0f, 0.0f, 1.0f
@@ -463,6 +486,23 @@ Quat QuatFromAngleUnitAxis(float32 angle, Vec3 axis)
 	quat.z = axis.z * sinf(angle / 2.0f);
 	quat.w = cosf(angle / 2.0f);
 	return quat;
+}
+
+Quat QuatFromEulerAngles(Vec3 euler)
+{
+	float32 cosYaw = cosf(euler.z * 0.5);
+	float32 sinYaw = sinf(euler.z * 0.5);
+	float32 cosRoll = cosf(euler.x * 0.5);
+	float32 sinRoll = sinf(euler.x * 0.5);
+	float32 cosPitch = cosf(euler.y * 0.5);
+	float32 sinPitch = sinf(euler.y * 0.5);
+
+	Quat q;
+	q.x = cosYaw*sinRoll*cosPitch - sinYaw*cosRoll*sinPitch;
+	q.y = cosYaw*cosRoll*sinPitch + sinYaw*sinRoll*cosPitch;
+	q.z = sinYaw*cosRoll*cosPitch - cosYaw*sinRoll*sinPitch;
+	q.w = cosYaw*cosRoll*cosPitch + sinYaw*sinRoll*sinPitch;
+	return q;
 }
 
 // Returns a new quaternion qInv such that q * qInv = Quat::one

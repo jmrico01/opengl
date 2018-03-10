@@ -49,4 +49,5 @@ void PrintHalfEdgeMesh(const HalfEdgeMesh& mesh);
 HalfEdgeMeshGL LoadHalfEdgeMeshGL(const HalfEdgeMesh& mesh);
 void FreeHalfEdgeMeshGL(const HalfEdgeMeshGL& meshGL);
 
-void DrawHalfEdgeMeshGL(const HalfEdgeMeshGL& meshGL);
+void DrawHalfEdgeMeshGL(const HalfEdgeMeshGL& meshGL,
+    float zoom, Vec3 rotation);
