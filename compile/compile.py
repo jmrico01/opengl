@@ -108,7 +108,7 @@ def WinCompileDebug():
     compileCommand = " ".join([
         "cl",
         macros, compilerFlags, compilerWarningFlags, includePaths,
-        "/Feprince.exe", "/Fmprince.map", paths["main-cpp"],
+        "/Feopengl.exe", "/Fmopengl.map", paths["main-cpp"],
         "/link", linkerFlags, libPaths, libs])
     
     loadCompiler = "call \"C:\\Program Files (x86)\\Microsoft Visual Studio 14.0\\VC\\vcvarsall.bat\" x64"
@@ -169,7 +169,7 @@ def LinuxCompileDebug():
     compileCommand = " ".join([
         "g++",
         compilerFlags, compilerWarningFlags, includePaths,
-        paths["main-cpp"], "-o prince",
+        paths["main-cpp"], "-o opengl",
         libPaths, libs
     ])
 
@@ -220,7 +220,7 @@ def MacCompileDebug():
     compileCommand = " ".join([
         "gcc",
         compilerFlags, compilerWarningFlags, includePaths,
-        paths["main-cpp"], "-o prince",
+        paths["main-cpp"], "-o opengl",
         libPaths, libs
     ])
 

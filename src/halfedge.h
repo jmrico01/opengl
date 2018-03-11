@@ -33,6 +33,7 @@ struct HalfEdgeMeshGL
 {
     GLuint vertexArray;
     GLuint vertexBuffer;
+    GLuint normalBuffer;
     GLuint indexBuffer;
     GLuint programID;
     int vertexCount;

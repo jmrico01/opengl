@@ -137,7 +137,7 @@ HalfEdgeMesh HalfEdgeMeshFromObj(const char* filePath)
     }
 
     faceInds.Free();
-    PrintHalfEdgeMesh(mesh);
+    //PrintHalfEdgeMesh(mesh);
 
     // TODO free mesh after this
     return mesh;
@@ -227,8 +227,8 @@ void Triangulate(HalfEdgeMesh* mesh)
         }
     }
 
-    printf("==> TRIANGULATION FINISHED\n");
-    PrintHalfEdgeMesh((const HalfEdgeMesh&)*mesh);
+    //printf("==> TRIANGULATION FINISHED\n");
+    //PrintHalfEdgeMesh((const HalfEdgeMesh&)*mesh);
 }
 
 void FreeHalfEdgeMesh(HalfEdgeMesh* mesh)
@@ -265,6 +265,31 @@ void PrintHalfEdgeMesh(const HalfEdgeMesh& mesh)
     }
 }
 
+internal Vec3 NormalFromTriangle(const Vec3 triangle[3])
+{
+    Vec3 a = triangle[1] - triangle[0];
+    Vec3 b = triangle[2] - triangle[0];
+    return Normalize(Cross(a, b));
+}
+
+// Computes normal for the face f, assuming all vertices in f are coplanar.
+internal Vec3 ComputeFaceNormal(const HalfEdgeMesh& mesh, uint32 f)
+{
+    Vec3 triangle[3];
+    int numEdges = 0;
+    uint32 edge = mesh.faces[f].halfEdge;
+    uint32 e = edge;
+    do {
+        triangle[numEdges++] = mesh.vertices[mesh.halfEdges[e].vertex].pos;
+        if (numEdges >= 3) {
+            break;
+        }
+        e = mesh.halfEdges[e].next;
+    } while (e != edge);
+
+    return NormalFromTriangle(triangle);
+}
+
 HalfEdgeMeshGL LoadHalfEdgeMeshGL(const HalfEdgeMesh& mesh)
 {
     HalfEdgeMesh meshTri = CopyHalfEdgeMesh(&mesh);
@@ -274,12 +299,16 @@ HalfEdgeMeshGL LoadHalfEdgeMeshGL(const HalfEdgeMesh& mesh)
     // TODO use indexing for this
     DynamicArray<Vec3> vertices;
     vertices.Init();
+    DynamicArray<Vec3> normals;
+    normals.Init();
 
     for (uint32 i = 0; i < meshTri.faces.size; i++) {
+        Vec3 normal = ComputeFaceNormal(meshTri, i);
         uint32 edge = meshTri.faces[i].halfEdge;
         uint32 e = edge;
         do {
             vertices.Append(meshTri.vertices[meshTri.halfEdges[e].vertex].pos);
+            normals.Append(normal);
             e = meshTri.halfEdges[e].next;
         } while (e != edge);
     }
@@ -294,6 +323,20 @@ HalfEdgeMeshGL LoadHalfEdgeMeshGL(const HalfEdgeMesh& mesh)
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(
         0, // match shader layout location
+        3, // size (vec3)
+        GL_FLOAT, // type
+        GL_FALSE, // normalized?
+        0, // stride
+        (void*)0 // array buffer offset
+    );
+
+    glGenBuffers(1, &meshGL.normalBuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, meshGL.normalBuffer);
+    glBufferData(GL_ARRAY_BUFFER, normals.size * sizeof(Vec3),
+        normals.data, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(
+        1, // match shader layout location
         3, // size (vec3)
         GL_FLOAT, // type
         GL_FALSE, // normalized?
@@ -322,15 +365,20 @@ void DrawHalfEdgeMeshGL(const HalfEdgeMeshGL& meshGL,
     GLint loc;
     glUseProgram(meshGL.programID);
 
+    // TODO Cheating with width_ & height_
+    Mat4 proj = Projection(110.0f, (float32)width_ / (float32)height_,
+        0.1f, 10.0f);
     Vec3 cameraPos = { 0.0f, 0.0f, zoom };
-    Mat4 vp = Translate(-cameraPos); /* * Projection(
-        120.0f, 1.0f,
-        0.1f, 10.0f);*/
-
+    Mat4 view = Translate(-cameraPos);
     Quat rot = QuatFromEulerAngles(rotation);
-    Mat4 mvp = UnitQuatToMat4(rot) * Scale(Vec3 { 0.2f, 0.2f, 0.2f }) * vp;
+    Mat4 model = UnitQuatToMat4(rot);
+    Mat4 mvp = proj * view * model;
     loc = glGetUniformLocation(meshGL.programID, "mvp");
     glUniformMatrix4fv(loc, 1, GL_FALSE, &mvp.e[0][0]);
+    loc = glGetUniformLocation(meshGL.programID, "model");
+    glUniformMatrix4fv(loc, 1, GL_FALSE, &model.e[0][0]);
+    loc = glGetUniformLocation(meshGL.programID, "view");
+    glUniformMatrix4fv(loc, 1, GL_FALSE, &view.e[0][0]);
 
     glBindVertexArray(meshGL.vertexArray);
     glDrawArrays(GL_TRIANGLES, 0, meshGL.vertexCount);

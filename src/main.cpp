@@ -68,7 +68,6 @@ internal void ErrorCallback(int err, const char* msg)
 internal void CharModsCallback(GLFWwindow* window,
     uint32 codepoint, int mods)
 {
-    printf("char callback: %d\n", codepoint);
     KeyEvent keyEvent = {
         (char)codepoint,
         true
@@ -90,11 +89,9 @@ internal void KeyCallback(GLFWwindow* window,
         KeyEvent keyEvent;
         keyEvent.ascii = 8;
         if (action == GLFW_PRESS) {
-            printf("backspace press\n");
             keyEvent.pressed = true;
         }
         else if (action == GLFW_RELEASE) {
-            printf("backspace release\n");
             keyEvent.pressed = false;
         }
         else {
@@ -229,7 +226,7 @@ int main(int argc, char* argv[])
     glGetIntegerv(GL_MINOR_VERSION, &glVerMinor);
     if (glVerMajor < 3 || (glVerMajor == 3 && glVerMinor < 3)) {
         glfwTerminate();
-        printf("PRINCE requires OpenGL 3.3 or later.\n");
+        printf("Requires OpenGL 3.3 or later.\n");
         printf("If your hardware supports it, update your drivers.\n");
         return 1;
     }
@@ -299,6 +296,14 @@ int main(int argc, char* argv[])
     Vec3 rotation = Vec3::zero;
     float zoom = 0.0f;
 
+    // Catch all GL errors before loop
+    {
+        GLenum glError;
+        while ((glError = glGetError()) != GL_NO_ERROR) {
+            printf("GL ERROR: %x\n", glError);
+        }
+    }
+
     while (!glfwWindowShouldClose(window)) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -320,19 +325,36 @@ int main(int argc, char* argv[])
 
             if (keyInputBuffer[i].ascii == 'a'
             || keyInputBuffer[i].ascii == 'A') {
-                rotation.x -= ROT_STEP;
+                rotation.y -= ROT_STEP;
             }
             if (keyInputBuffer[i].ascii == 'd'
             || keyInputBuffer[i].ascii == 'D') {
-                rotation.x += ROT_STEP;
+                rotation.y += ROT_STEP;
             }
             if (keyInputBuffer[i].ascii == 's'
             || keyInputBuffer[i].ascii == 'S') {
-                rotation.y -= ROT_STEP;
+                rotation.x -= ROT_STEP;
             }
             if (keyInputBuffer[i].ascii == 'w'
             || keyInputBuffer[i].ascii == 'W') {
-                rotation.y += ROT_STEP;
+                rotation.x += ROT_STEP;
+            }
+            if (keyInputBuffer[i].ascii == 'q'
+            || keyInputBuffer[i].ascii == 'Q') {
+                rotation.z -= ROT_STEP;
+            }
+            if (keyInputBuffer[i].ascii == 'e'
+            || keyInputBuffer[i].ascii == 'E') {
+                rotation.z += ROT_STEP;
+            }
+        }
+        // Clamp rotation angles
+        for (int i = 0; i < 3; i++) {
+            while (rotation.e[i] < -PI_F) {
+                rotation.e[i] += 2.0f * PI_F;
+            }
+            while (rotation.e[i] > PI_F) {
+                rotation.e[i] -= 2.0f * PI_F;
             }
         }
         DrawHalfEdgeMeshGL(meshGL, zoom, rotation);
@@ -420,6 +442,14 @@ int main(int argc, char* argv[])
 
         glfwSwapBuffers(window);
         glfwWaitEvents();
+        
+        // Catch all GL errors during game loop
+        {
+            GLenum glError;
+            while ((glError = glGetError()) != GL_NO_ERROR) {
+                printf("GL ERROR: %x\n", glError);
+            }
+        }
     }
 
     glfwTerminate();

@@ -253,7 +253,11 @@ inline float32 Dot(Vec3 v1, Vec3 v2)
 }
 inline Vec3 Cross(Vec3 v1, Vec3 v2)
 {
-	return Vec3{ 0.0f, 0.0f, 0.0f };
+	return Vec3 {
+        v1.y * v2.z - v1.z * v2.y,
+        v1.z * v2.x - v1.x * v2.z,
+        v1.x * v2.y - v1.y * v2.x
+    };
 }
 
 inline float32 MagSq(Vec3 v)
@@ -450,24 +454,24 @@ Mat4 Scale(Vec3 v)
 }
 
 Mat4 Projection(float32 fov, float32 aspect,
-	float32 near, float32 far)
+	float32 nearZ, float32 farZ)
 {
-    float32 degToRad = M_PI / 180.0;
-    float32 yScale = 1.0 / tanf(degToRad * fov / 2);
+    float32 degToRad = PI_F / 180.0f;
+    float32 yScale = 1.0f / tanf(degToRad * fov / 2.0f);
     float32 xScale = yScale / aspect;
-    float32 nearmfar = near - far;
+    float32 nearMinusFar = nearZ - farZ;
+	Mat4 proj = {
+        xScale, 0.0f, 0.0f, 0.0f,
+        0.0f, yScale, 0.0f, 0.0f,
+        0.0f, 0.0f, (farZ + nearZ) / nearMinusFar, -1.0f,
+        0.0f, 0.0f, 2.0f*farZ*nearZ / nearMinusFar, 0.0f
+    };
 	/*Mat4 proj = {
         xScale, 0, 0, 0,
         0, yScale, 0, 0,
-        0, 0, (far + near) / nearmfar, -1.0f,
-        0, 0, 2.0f*far*near / nearmfar, 0 
-    };*/
-	Mat4 proj = {
-        xScale, 0, 0, 0,
-        0, yScale, 0, 0,
-        0, 0, (far + near) / nearmfar, 2.0f*far*near / nearmfar,
+        0, 0, (farZ + nearZ) / nearMinusFar, 2.0f*farZ*nearZ / nearMinusFar,
         0, 0, -1.0f, 0 
-    };
+    };*/
 
 	return proj;
 }
@@ -477,32 +481,15 @@ const Quat Quat::one = {
     0.0f, 0.0f, 0.0f, 1.0f
 };
 
-// Axis should be a unit vector
-Quat QuatFromAngleUnitAxis(float32 angle, Vec3 axis)
+// Compounds two rotations q1 and q2 (like matrices: q2 first, then q1)
+inline Quat operator*(Quat q1, Quat q2)
 {
-	Quat quat;
-	quat.x = axis.x * sinf(angle / 2.0f);
-	quat.y = axis.y * sinf(angle / 2.0f);
-	quat.z = axis.z * sinf(angle / 2.0f);
-	quat.w = cosf(angle / 2.0f);
-	return quat;
-}
-
-Quat QuatFromEulerAngles(Vec3 euler)
-{
-	float32 cosYaw = cosf(euler.z * 0.5);
-	float32 sinYaw = sinf(euler.z * 0.5);
-	float32 cosRoll = cosf(euler.x * 0.5);
-	float32 sinRoll = sinf(euler.x * 0.5);
-	float32 cosPitch = cosf(euler.y * 0.5);
-	float32 sinPitch = sinf(euler.y * 0.5);
-
-	Quat q;
-	q.x = cosYaw*sinRoll*cosPitch - sinYaw*cosRoll*sinPitch;
-	q.y = cosYaw*cosRoll*sinPitch + sinYaw*sinRoll*cosPitch;
-	q.z = sinYaw*cosRoll*cosPitch - cosYaw*sinRoll*sinPitch;
-	q.w = cosYaw*cosRoll*cosPitch + sinYaw*sinRoll*sinPitch;
-	return q;
+	Quat result;
+	result.x = q1.w*q2.x + q1.x*q2.w + q1.y*q2.z - q1.z*q2.y;
+	result.y = q1.w*q2.y + q1.y*q2.w + q1.z*q2.x - q1.x*q2.z;
+	result.z = q1.w*q2.z + q1.z*q2.w + q1.x*q2.y - q1.y*q2.x;
+	result.w = q1.w*q2.w - q1.x*q2.x - q1.y*q2.y - q1.z*q2.z;
+	return result;
 }
 
 // Returns a new quaternion qInv such that q * qInv = Quat::one
@@ -514,17 +501,6 @@ inline Quat Inverse(Quat q)
 	inv.z = -q.z;
 	inv.w = q.w;
 	return inv;
-}
-
-// Compounds two rotations q1 and q2 (like matrices: q2 first, then q1)
-inline Quat operator*(Quat q1, Quat q2)
-{
-	Quat result;
-	result.x = q1.w*q2.x + q1.x*q2.w + q1.y*q2.z - q1.z*q2.y;
-	result.y = q1.w*q2.y + q1.y*q2.w + q1.z*q2.x - q1.x*q2.z;
-	result.z = q1.w*q2.z + q1.z*q2.w + q1.x*q2.y - q1.y*q2.x;
-	result.w = q1.w*q2.w - q1.x*q2.x - q1.y*q2.y - q1.z*q2.z;
-	return result;
 }
 
 // Rotates vector v by quaternion q
@@ -545,6 +521,38 @@ inline Vec3 operator*(Quat q, Vec3 v)
 	result.y = qvqInv.y;
 	result.z = qvqInv.z;
 	return result;
+}
+
+// Axis should be a unit vector
+Quat QuatFromAngleUnitAxis(float32 angle, Vec3 axis)
+{
+	Quat quat;
+	quat.x = axis.x * sinf(angle / 2.0f);
+	quat.y = axis.y * sinf(angle / 2.0f);
+	quat.z = axis.z * sinf(angle / 2.0f);
+	quat.w = cosf(angle / 2.0f);
+	return quat;
+}
+
+Quat QuatFromEulerAngles(Vec3 euler)
+{
+	/*float32 cosYaw = cosf(euler.z * 0.5f);
+	float32 sinYaw = sinf(euler.z * 0.5f);
+	float32 cosRoll = cosf(euler.x * 0.5f);
+	float32 sinRoll = sinf(euler.x * 0.5f);
+	float32 cosPitch = cosf(euler.y * 0.5f);
+	float32 sinPitch = sinf(euler.y * 0.5f);
+
+	Quat q;
+	q.x = cosYaw*sinRoll*cosPitch - sinYaw*cosRoll*sinPitch;
+	q.y = cosYaw*cosRoll*sinPitch + sinYaw*sinRoll*cosPitch;
+	q.z = sinYaw*cosRoll*cosPitch - cosYaw*sinRoll*sinPitch;
+	q.w = cosYaw*cosRoll*cosPitch + sinYaw*sinRoll*sinPitch;
+	return q;*/
+    Quat quat = QuatFromAngleUnitAxis(euler.x, Vec3 { 1.0f, 0.0f, 0.0f });
+    quat = QuatFromAngleUnitAxis(euler.y, Vec3 { 0.0f, 1.0f, 0.0f }) * quat;
+    quat = QuatFromAngleUnitAxis(euler.z, Vec3 { 0.0f, 0.0f, 1.0f }) * quat;
+    return quat;
 }
 
 // q, as always, must be a unit quaternion
