@@ -237,11 +237,6 @@ int main(int argc, char* argv[])
     // TODO error checking?
     InitOpenGL();
     ResizeGL(width_, height_);
-    // NOTE this isn't like "create a rect instance", but more like
-    // "initialize rect drawing in general"
-    /*RectGL rectGL = CreateRectGL();
-    TexturedRectGL texturedRectGL = CreateTexturedRectGL();
-    TextGL textGL = CreateTextGL();*/
     
     FT_Library library;
     FT_Error error = FT_Init_FreeType(&library);
@@ -249,6 +244,13 @@ int main(int argc, char* argv[])
         printf("FreeType init error: %d\n", error);
         return 1;
     }
+
+    // NOTE this isn't like "create a rect instance", but more like
+    // "initialize rect drawing in general"
+    /*RectGL rectGL = CreateRectGL();
+    TexturedRectGL texturedRectGL = CreateTexturedRectGL();
+    TextGL textGL = CreateTextGL();*/
+    LineGL lineGL = CreateLineGL();
 
     /*GLuint textureKM = OpenGLLoadBMP("data/images/kapricorn.bmp");
     FontFace cmSerif = LoadFontFace(
@@ -275,7 +277,7 @@ int main(int argc, char* argv[])
         fields[2] = CreateInputField(fieldOrigin, fieldSize);
     }
 
-    HalfEdgeMesh mesh = HalfEdgeMeshFromObj("data/models/cube.obj");
+    HalfEdgeMesh mesh = HalfEdgeMeshFromObj("data/models/octopus.obj");
     if (mesh.vertices.size == 0) {
         printf("not loaded\n");
     }
@@ -293,9 +295,6 @@ int main(int argc, char* argv[])
 
     glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
 
-    Vec3 rotation = Vec3::zero;
-    float zoom = 0.0f;
-
     // Catch all GL errors before loop
     {
         GLenum glError;
@@ -303,6 +302,12 @@ int main(int argc, char* argv[])
             printf("GL ERROR: %x\n", glError);
         }
     }
+
+    Mat4 proj = Projection(110.0f, (float32)width_ / (float32)height_,
+        0.1f, 10.0f);
+    Vec3 cameraPos = { 0.0f, 0.0f, 5.0f };
+
+    Vec3 modelRotation = Vec3::zero;
 
     while (!glfwWindowShouldClose(window)) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -316,48 +321,63 @@ int main(int argc, char* argv[])
 
             if (keyInputBuffer[i].ascii == 'z'
             || keyInputBuffer[i].ascii == 'Z') {
-                zoom -= ZOOM_STEP;
+                cameraPos.z += ZOOM_STEP;
             }
             if (keyInputBuffer[i].ascii == 'x'
             || keyInputBuffer[i].ascii == 'X') {
-                zoom += ZOOM_STEP;
+                cameraPos.z -= ZOOM_STEP;
             }
 
             if (keyInputBuffer[i].ascii == 'a'
             || keyInputBuffer[i].ascii == 'A') {
-                rotation.y -= ROT_STEP;
+                modelRotation.y -= ROT_STEP;
             }
             if (keyInputBuffer[i].ascii == 'd'
             || keyInputBuffer[i].ascii == 'D') {
-                rotation.y += ROT_STEP;
+                modelRotation.y += ROT_STEP;
             }
             if (keyInputBuffer[i].ascii == 's'
             || keyInputBuffer[i].ascii == 'S') {
-                rotation.x -= ROT_STEP;
+                modelRotation.x -= ROT_STEP;
             }
             if (keyInputBuffer[i].ascii == 'w'
             || keyInputBuffer[i].ascii == 'W') {
-                rotation.x += ROT_STEP;
+                modelRotation.x += ROT_STEP;
             }
             if (keyInputBuffer[i].ascii == 'q'
             || keyInputBuffer[i].ascii == 'Q') {
-                rotation.z -= ROT_STEP;
+                modelRotation.z -= ROT_STEP;
             }
             if (keyInputBuffer[i].ascii == 'e'
             || keyInputBuffer[i].ascii == 'E') {
-                rotation.z += ROT_STEP;
+                modelRotation.z += ROT_STEP;
             }
         }
         // Clamp rotation angles
         for (int i = 0; i < 3; i++) {
-            while (rotation.e[i] < -PI_F) {
-                rotation.e[i] += 2.0f * PI_F;
+            while (modelRotation.e[i] < -PI_F) {
+                modelRotation.e[i] += 2.0f * PI_F;
             }
-            while (rotation.e[i] > PI_F) {
-                rotation.e[i] -= 2.0f * PI_F;
+            while (modelRotation.e[i] > PI_F) {
+                modelRotation.e[i] -= 2.0f * PI_F;
             }
         }
-        DrawHalfEdgeMeshGL(meshGL, zoom, rotation);
+        Mat4 view = Translate(-cameraPos) * Rotate(modelRotation);
+        DrawHalfEdgeMeshGL(meshGL, proj, view);
+
+        // Draw axis lines
+        const float AXIS_LINE_LEN = 20.0f;
+        for (int i = 0; i < 3; i++) {
+            Vec3 v1 = Vec3::zero;
+            v1.e[i] = -AXIS_LINE_LEN / 2.0f;
+            Vec3 v2 = Vec3::zero;
+            v2.e[i] = AXIS_LINE_LEN / 2.0f;
+            Vec4 color = Vec4::zero;
+            color.e[i] = 1.0f;
+            color.a = 1.0f;
+
+            DrawLine(lineGL, proj, view, v1, v2, color);
+        }
 
 #if 0
         { // Test draws (primitives & text)

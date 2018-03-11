@@ -359,19 +359,12 @@ void FreeHalfEdgeMeshGL(const HalfEdgeMeshGL& meshGL)
 {
 }
 
-void DrawHalfEdgeMeshGL(const HalfEdgeMeshGL& meshGL,
-    float zoom, Vec3 rotation)
+void DrawHalfEdgeMeshGL(const HalfEdgeMeshGL& meshGL, Mat4 proj, Mat4 view)
 {
     GLint loc;
     glUseProgram(meshGL.programID);
-
-    // TODO Cheating with width_ & height_
-    Mat4 proj = Projection(110.0f, (float32)width_ / (float32)height_,
-        0.1f, 10.0f);
-    Vec3 cameraPos = { 0.0f, 0.0f, zoom };
-    Mat4 view = Translate(-cameraPos);
-    Quat rot = QuatFromEulerAngles(rotation);
-    Mat4 model = UnitQuatToMat4(rot);
+    
+    Mat4 model = Mat4::one;
     Mat4 mvp = proj * view * model;
     loc = glGetUniformLocation(meshGL.programID, "mvp");
     glUniformMatrix4fv(loc, 1, GL_FALSE, &mvp.e[0][0]);

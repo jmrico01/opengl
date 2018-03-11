@@ -152,6 +152,11 @@ inline Vec2& operator/=(Vec2& v, float32 s)
 	return v;
 }
 
+inline bool operator==(const Vec2& v1, const Vec2& v2)
+{
+    return v1.x == v2.x && v1.y == v2.y;
+}
+
 inline float32 Dot(Vec2 v1, Vec2 v2)
 {
 	return v1.x * v2.x + v1.y * v2.y;
@@ -245,6 +250,11 @@ inline Vec3& operator/=(Vec3& v, float32 s)
 {
 	v = v / s;
 	return v;
+}
+
+inline bool operator==(const Vec3& v1, const Vec3& v2)
+{
+    return v1.x == v2.x && v1.y == v2.y && v1.z == v2.z;
 }
 
 inline float32 Dot(Vec3 v1, Vec3 v2)
@@ -358,6 +368,11 @@ inline Vec4& operator/=(Vec4& v, float32 s)
 	return v;
 }
 
+inline bool operator==(const Vec4& v1, const Vec4& v2)
+{
+    return v1.x == v2.x && v1.y == v2.y && v1.z == v2.z && v1.w == v2.w;
+}
+
 // -------------------- Mat4 --------------------
 // TODO these functions might be better off not inlined
 // though they are used very infrequently
@@ -453,6 +468,31 @@ Mat4 Scale(Vec3 v)
 	return result;
 }
 
+Mat4 Rotate(Vec3 r)
+{
+    Mat4 rx = {
+        1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, cosf(r.x), -sinf(r.x), 0.0f,
+        0.0f, sinf(r.x), cosf(r.x), 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f
+    };
+    Mat4 ry = {
+        cosf(r.y), 0.0f, sinf(r.y), 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        -sinf(r.y), 0.0f, cosf(r.y), 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f
+    };
+    Mat4 rz = {
+        cosf(r.z), -sinf(r.z), 0.0f, 0.0f,
+        sinf(r.z), cosf(r.z), 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f
+    };
+
+    // Order: <- yaw <- pitch <- roll <-
+    return rz * ry * rx;
+}
+
 Mat4 Projection(float32 fov, float32 aspect,
 	float32 nearZ, float32 farZ)
 {
@@ -534,6 +574,7 @@ Quat QuatFromAngleUnitAxis(float32 angle, Vec3 axis)
 	return quat;
 }
 
+// TODO not working
 Quat QuatFromEulerAngles(Vec3 euler)
 {
 	/*float32 cosYaw = cosf(euler.z * 0.5f);
@@ -553,6 +594,17 @@ Quat QuatFromEulerAngles(Vec3 euler)
     quat = QuatFromAngleUnitAxis(euler.y, Vec3 { 0.0f, 1.0f, 0.0f }) * quat;
     quat = QuatFromAngleUnitAxis(euler.z, Vec3 { 0.0f, 0.0f, 1.0f }) * quat;
     return quat;
+}
+
+Quat QuatRotBetweenVectors(Vec3 v1, Vec3 v2)
+{
+    Vec3 axis = Cross(v1, v2);
+    float angle = asinf(Mag(axis) / (Mag(v1) * Mag(v2)));
+    if (axis == Vec3::zero) {
+        return Quat::one;
+    }
+
+    return QuatFromAngleUnitAxis(angle, Normalize(axis));
 }
 
 // q, as always, must be a unit quaternion

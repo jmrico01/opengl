@@ -231,6 +231,40 @@ TexturedRectGL CreateTexturedRectGL()
     return texturedRectGL;
 }
 
+LineGL CreateLineGL()
+{
+    LineGL lineGL;
+    const GLfloat vertices[] = {
+        0.0f, 0.0f, 0.0f,
+        1.0f, 0.0f, 0.0f
+    };
+
+    glGenVertexArrays(1, &lineGL.vertexArray);
+    glBindVertexArray(lineGL.vertexArray);
+
+    glGenBuffers(1, &lineGL.vertexBuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, lineGL.vertexBuffer);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices,
+        GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(
+        0, // match shader layout location
+        3, // size (vec3)
+        GL_FLOAT, // type
+        GL_FALSE, // normalized?
+        0, // stride
+        (void*)0 // array buffer offset
+    );
+
+    glBindVertexArray(0);
+
+    lineGL.programID = LoadShaders(
+        "shaders/line.vert",
+        "shaders/line.frag");
+    
+    return lineGL;
+}
+
 void DrawRect(
     RectGL rectGL,
     Vec3 pos, Vec2 anchor, Vec2 size, Vec4 color)
@@ -276,5 +310,28 @@ void DrawTexturedRect(
 
     glBindVertexArray(texturedRectGL.vertexArray);
     glDrawArrays(GL_TRIANGLES, 0, 6);
+    glBindVertexArray(0);
+}
+
+void DrawLine(
+    LineGL lineGL, Mat4 proj, Mat4 view,
+    Vec3 v1, Vec3 v2, Vec4 color)
+{
+    GLint loc;
+    glUseProgram(lineGL.programID);
+
+    Vec3 unitX = { 1.0f, 0.0f, 0.0f };
+    Quat rot = QuatRotBetweenVectors(unitX, v2 - v1);
+    float scale = Mag(v2 - v1);
+    Mat4 model = Translate(v1) * UnitQuatToMat4(rot) * Scale(scale);
+    Mat4 mvp = proj * view * model;
+    //Mat4 mvp = Mat4::one;
+    loc = glGetUniformLocation(lineGL.programID, "mvp");
+    glUniformMatrix4fv(loc, 1, GL_FALSE, &mvp.e[0][0]);
+    loc = glGetUniformLocation(lineGL.programID, "color");
+    glUniform4fv(loc, 1, &color.e[0]);
+
+    glBindVertexArray(lineGL.vertexArray);
+    glDrawArrays(GL_LINES, 0, 2);
     glBindVertexArray(0);
 }
