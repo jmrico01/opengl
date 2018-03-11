@@ -288,9 +288,9 @@ int main(int argc, char* argv[])
         Vec2 buttonSize = { 200.0f, 32.0f };
         buttons.Append(CreateButton(buttonOrigin, buttonSize,
             "Button Test", CallbackTest,
-            Vec4::zero,
-            Vec4 {1.0f, 0.0f, 0.0f, 1.0f},
-            Vec4 {0.0f, 1.0f, 0.0f, 1.0f}));
+            Vec4 {0.0f, 0.0f, 0.0f, 0.2f},
+            Vec4 {0.0f, 0.0f, 0.0f, 0.5f},
+            Vec4 {0.0f, 0.0f, 0.0f, 0.8f}));
     }
 
     HalfEdgeMesh mesh = HalfEdgeMeshFromObj("data/models/octopus.obj");
