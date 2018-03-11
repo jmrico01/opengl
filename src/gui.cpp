@@ -4,23 +4,46 @@
 #include "ogl_base.h"
 #include "text.h"
 
-ClickableBox CreateClickableBox(Vec2 origin, Vec2 size)
+ClickableBox CreateClickableBox(Vec2 origin, Vec2 size,
+    Vec4 color, Vec4 hoverColor, Vec4 pressColor)
 {
     ClickableBox box = {};
     box.origin = origin;
     box.size = size;
+
+    box.hovered = false;
+    box.pressed = false;
+
+    box.color = color;
+    box.hoverColor = hoverColor;
+    box.pressColor = pressColor;
 
     return box;
 }
 
-InputField CreateInputField(Vec2 origin, Vec2 size)
+Button CreateButton(Vec2 origin, Vec2 size,
+    const char* text, ButtonCallback callback,
+    Vec4 color, Vec4 hoverColor, Vec4 pressColor)
+{
+    Button button = {};
+    button.box = CreateClickableBox(origin, size,
+        color, hoverColor, pressColor);
+
+    uint32 textLen = (uint32)strnlen(text, INPUT_BUFFER_SIZE - 1);
+    strncpy(button.text, text, textLen);
+    button.text[textLen] = '\0';
+    button.callback = callback;
+
+    return button;
+}
+
+InputField CreateInputField(Vec2 origin, Vec2 size,
+    Vec4 color, Vec4 hoverColor, Vec4 pressColor)
 {
     InputField inputField = {};
-    ClickableBox box = {};
-    box.origin = origin;
-    box.size = size;
-    
-    inputField.box = box;
+    inputField.box = CreateClickableBox(origin, size,
+        color, hoverColor, pressColor);
+
     inputField.text[0] = '\0';
     inputField.textLen = 0;
 
@@ -50,17 +73,39 @@ void DrawClickableBoxes(ClickableBox boxes[], uint32 n, RectGL rectGL)
 {
     for (uint32 i = 0; i < n; i++) {
         Vec3 pos = { boxes[i].origin.x, boxes[i].origin.y, 0.0f };
-        Vec4 color = { 1.0f, 1.0f, 1.0f, 1.0f };
+        Vec4 color = boxes[i].color;
         if (boxes[i].hovered) {
-            color.a = 0.5f;
-            // TODO custom callback or something?
+            color = boxes[i].hoverColor;
         }
         if (boxes[i].pressed) {
-            color.a = 0.0f;
-            // TODO custom callback or something?
+            color = boxes[i].pressColor;
         }
 
         DrawRect(rectGL, pos, Vec2::zero, boxes[i].size, color);
+    }
+}
+
+void UpdateButtons(Button buttons[], uint32 n, Vec2 mousePos, int clickState)
+{
+    for (uint32 i = 0; i < n; i++) {
+        bool wasPressed = buttons[i].box.pressed;
+        UpdateClickableBoxes(&buttons[i].box, n, mousePos, clickState);
+
+        if (buttons[i].box.hovered && wasPressed && !buttons[i].box.pressed) {
+            buttons[i].callback();
+        }
+    }
+}
+
+void DrawButtons(Button buttons[], uint32 n,
+    RectGL rectGL, TextGL textGL, const FontFace& face)
+{
+    for (uint32 i = 0; i < n; i++) {
+        DrawClickableBoxes(&buttons[i].box, n, rectGL);
+        Vec3 textPos = {
+            buttons[i].box.origin.x, buttons[i].box.origin.y, 0.0f
+        };
+        DrawText(textGL, face, buttons[i].text, textPos, Vec4::black);
     }
 }
 

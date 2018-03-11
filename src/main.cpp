@@ -183,6 +183,11 @@ ReadFileResult ReadFile(const char* path)
     return result;
 }
 
+void CallbackTest()
+{
+    printf("Button has been pressed\n");
+}
+
 int main(int argc, char* argv[])
 {
     RemoveFileNameFromPath(argv[0], pathToApp_, PATH_MAX_LENGTH);
@@ -247,34 +252,45 @@ int main(int argc, char* argv[])
 
     // NOTE this isn't like "create a rect instance", but more like
     // "initialize rect drawing in general"
-    /*RectGL rectGL = CreateRectGL();
-    TexturedRectGL texturedRectGL = CreateTexturedRectGL();
-    TextGL textGL = CreateTextGL();*/
+    RectGL rectGL = CreateRectGL();
+    //TexturedRectGL texturedRectGL = CreateTexturedRectGL();
+    TextGL textGL = CreateTextGL();
     LineGL lineGL = CreateLineGL();
 
-    /*GLuint textureKM = OpenGLLoadBMP("data/images/kapricorn.bmp");
+    GLuint textureKM = OpenGLLoadBMP("data/images/kapricorn.bmp");
     FontFace cmSerif = LoadFontFace(
         library, "data/fonts/computer-modern/serif.ttf", 32);
     FontFace cmSerifBold = LoadFontFace(
         library, "data/fonts/computer-modern/serif-bold.ttf", 48);
     FontFace cmSerifBold128 = LoadFontFace(
-        library, "data/fonts/computer-modern/serif-bold.ttf", 128);*/
+        library, "data/fonts/computer-modern/serif-bold.ttf", 128);
 
-    const int numBoxes = 1;
-    ClickableBox boxes[numBoxes];
-    const int numFields = 3;
-    InputField fields[numFields];
+    DynamicArray<ClickableBox> boxes;
+    boxes.Init();
+    DynamicArray<Button> buttons;
+    buttons.Init();
+    DynamicArray<InputField> fields;
+    fields.Init();
     {
-        Vec2 guiBoxOrigin = { 100.0f, 100.0f };
+        /*Vec2 guiBoxOrigin = { 100.0f, 100.0f };
         Vec2 guiBoxSize = { 100.0f, 80.0f };
-        boxes[0] = CreateClickableBox(guiBoxOrigin, guiBoxSize);
+        boxes.Append(CreateClickableBox(guiBoxOrigin, guiBoxSize));
+
         Vec2 fieldOrigin = { 250.0f, 100.0f };
         Vec2 fieldSize = { 400.0f, 32.0f };
-        fields[0] = CreateInputField(fieldOrigin, fieldSize);
+        fields.Append(CreateInputField(fieldOrigin, fieldSize));
         fieldOrigin = { 250.0f, 200.0f };
-        fields[1] = CreateInputField(fieldOrigin, fieldSize);
+        fields.Append(CreateInputField(fieldOrigin, fieldSize));
         fieldOrigin = { 250.0f, 300.0f };
-        fields[2] = CreateInputField(fieldOrigin, fieldSize);
+        fields.Append(CreateInputField(fieldOrigin, fieldSize));*/
+
+        Vec2 buttonOrigin = { 100.0f, 200.0f };
+        Vec2 buttonSize = { 200.0f, 32.0f };
+        buttons.Append(CreateButton(buttonOrigin, buttonSize,
+            "Button Test", CallbackTest,
+            Vec4::zero,
+            Vec4 {1.0f, 0.0f, 0.0f, 1.0f},
+            Vec4 {0.0f, 1.0f, 0.0f, 1.0f}));
     }
 
     HalfEdgeMesh mesh = HalfEdgeMeshFromObj("data/models/octopus.obj");
@@ -303,10 +319,7 @@ int main(int argc, char* argv[])
         }
     }
 
-    Mat4 proj = Projection(110.0f, (float32)width_ / (float32)height_,
-        0.1f, 10.0f);
     Vec3 cameraPos = { 0.0f, 0.0f, 5.0f };
-
     Vec3 modelRotation = Vec3::zero;
 
     while (!glfwWindowShouldClose(window)) {
@@ -362,6 +375,12 @@ int main(int argc, char* argv[])
                 modelRotation.e[i] -= 2.0f * PI_F;
             }
         }
+
+        // 3D rendering start
+        glEnable(GL_DEPTH_TEST);
+
+        Mat4 proj = Projection(110.0f, (float32)width_ / (float32)height_,
+            0.1f, 10.0f);
         Mat4 view = Translate(-cameraPos) * Rotate(modelRotation);
         DrawHalfEdgeMeshGL(meshGL, proj, view);
 
@@ -379,12 +398,14 @@ int main(int argc, char* argv[])
             DrawLine(lineGL, proj, view, v1, v2, color);
         }
 
-#if 0
+        glDisable(GL_DEPTH_TEST);
+        // 3D rendering end
+
         { // Test draws (primitives & text)
-            Vec3 kmPos = { 100.0f, 100.0f, 0.0f };
+            /*Vec3 kmPos = { 100.0f, 100.0f, 0.0f };
             Vec2 kmSize = { 400.0f, 400.0f };
             DrawTexturedRect(texturedRectGL,
-                kmPos, Vec2::zero, kmSize, textureKM);
+                kmPos, Vec2::zero, kmSize, textureKM);*/
 
             Vec3 textPos = { 100.0f, 600.0f, 0.0f };
             Vec4 textColor = { 0.1f, 0.1f, 0.1f, 1.0f };
@@ -449,13 +470,15 @@ int main(int argc, char* argv[])
             mouseY = (double)height_ - mouseY;
             Vec2 mousePos = { (float)mouseX, (float)mouseY };
 
-            UpdateClickableBoxes(boxes, numBoxes, mousePos, clickState_);
-            UpdateInputFields(fields, numFields, mousePos, clickState_,
+            UpdateClickableBoxes(boxes.data, boxes.size, mousePos, clickState_);
+            UpdateButtons(buttons.data, buttons.size, mousePos, clickState_);
+            UpdateInputFields(fields.data, fields.size, mousePos, clickState_,
                 keyInputBuffer, keyInputBufferSize);
-            DrawClickableBoxes(boxes, numBoxes, rectGL);
-            DrawInputFields(fields, numFields, rectGL, textGL, cmSerif);
+
+            DrawClickableBoxes(boxes.data, boxes.size, rectGL);
+            DrawButtons(buttons.data, buttons.size, rectGL, textGL, cmSerif);
+            DrawInputFields(fields.data, fields.size, rectGL, textGL, cmSerif);
         }
-#endif
 
         // Clear all key events
         keyInputBufferSize = 0;
