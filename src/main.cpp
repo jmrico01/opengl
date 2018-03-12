@@ -183,9 +183,50 @@ ReadFileResult ReadFile(const char* path)
     return result;
 }
 
-void CallbackTest()
+#define DEFAULT_CAM_Z 4.0f
+
+struct SharedState
 {
-    printf("Button has been pressed\n");
+    Vec3 cameraPos;
+    Vec3 modelRotation;
+
+    HalfEdgeMesh mesh;
+    HalfEdgeMeshGL meshGL;
+};
+
+void CallbackEmpty(SharedState* state, void* data)
+{
+}
+
+void ReloadMesh(SharedState* state)
+{
+    FreeHalfEdgeMeshGL(state->meshGL);
+    state->meshGL = LoadHalfEdgeMeshGL(state->mesh);
+}
+
+void FuncResetView(SharedState* state, void* data)
+{
+    state->cameraPos = { 0.0f, 0.0f, DEFAULT_CAM_Z };
+    state->modelRotation = { -0.5f, 0.6f, 0.3f };
+}
+
+void FuncTranslate(SharedState* state, void* data)
+{
+    // TODO grab this from void* data.
+    Vec3 offset = { 1.0f, 0.0f, 1.0f };
+    for (uint32 i = 0; i < state->mesh.vertices.size; i++) {
+        state->mesh.vertices[i].pos += offset;
+    }
+
+    ReloadMesh(state);
+}
+void FuncRotate(SharedState* state, void* data)
+{
+    printf("Rotate\n");
+}
+void FuncScale(SharedState* state, void* data)
+{
+    printf("Scale\n");
 }
 
 int main(int argc, char* argv[])
@@ -257,13 +298,32 @@ int main(int argc, char* argv[])
     TextGL textGL = CreateTextGL();
     LineGL lineGL = CreateLineGL();
 
-    GLuint textureKM = OpenGLLoadBMP("data/images/kapricorn.bmp");
+    //GLuint textureKM = OpenGLLoadBMP("data/images/kapricorn.bmp");
     FontFace cmSerif = LoadFontFace(
+        library, "data/fonts/computer-modern/serif.ttf", 24);
+    /*FontFace cmSerif32 = LoadFontFace(
         library, "data/fonts/computer-modern/serif.ttf", 32);
     FontFace cmSerifBold = LoadFontFace(
         library, "data/fonts/computer-modern/serif-bold.ttf", 48);
     FontFace cmSerifBold128 = LoadFontFace(
-        library, "data/fonts/computer-modern/serif-bold.ttf", 128);
+        library, "data/fonts/computer-modern/serif-bold.ttf", 128);*/
+
+    struct FunctionInfo {
+        const char* name;
+        ButtonCallback callback;
+        void* data;
+    } functions[] = {
+        { "Reset View", FuncResetView },
+        { "",           CallbackEmpty },
+        { "Translate",  FuncTranslate },
+        { "Rotate",     FuncRotate },
+        { "Scale",      FuncScale },
+        { "",           CallbackEmpty },
+        { "Twist",      CallbackEmpty },
+        { "Inflate",    CallbackEmpty },
+        { "Wacky",      CallbackEmpty }
+    };
+    const int numFuncs = sizeof(functions) / sizeof(functions[0]);
 
     DynamicArray<ClickableBox> boxes;
     boxes.Init();
@@ -284,32 +344,41 @@ int main(int argc, char* argv[])
         fieldOrigin = { 250.0f, 300.0f };
         fields.Append(CreateInputField(fieldOrigin, fieldSize));*/
 
-        Vec2 buttonOrigin = { 100.0f, 200.0f };
-        Vec2 buttonSize = { 200.0f, 32.0f };
-        buttons.Append(CreateButton(buttonOrigin, buttonSize,
-            "Button Test", CallbackTest,
-            Vec4 {0.0f, 0.0f, 0.0f, 0.2f},
-            Vec4 {0.0f, 0.0f, 0.0f, 0.5f},
-            Vec4 {0.0f, 0.0f, 0.0f, 0.8f}));
+        for (int i = 0; i < numFuncs; i++) {
+            Vec2 origin = { 10.0f, 10.0f + 1.1f * cmSerif.height * (i + 1) };
+            Vec2 size = {
+                (float32)GetTextWidth(cmSerif, functions[i].name),
+                (float32)cmSerif.height
+            };
+            FunctionInfo fi = functions[i];
+            Button button = CreateButton(origin, size,
+                fi.name, fi.callback, nullptr,
+                Vec4 {1.0f, 1.0f, 0.0f, 0.2f},
+                Vec4 {1.0f, 1.0f, 0.0f, 0.5f},
+                Vec4 {1.0f, 1.0f, 0.0f, 0.8f},
+                Vec4 {0.8f, 0.8f, 0.8f, 1.0f}
+            );
+            buttons.Append(button);
+        }
     }
 
-    HalfEdgeMesh mesh = HalfEdgeMeshFromObj("data/models/octopus.obj");
-    if (mesh.vertices.size == 0) {
+    SharedState state;
+
+    state.mesh = HalfEdgeMeshFromObj("data/models/cheetah.obj");
+    if (state.mesh.vertices.size == 0) {
         printf("not loaded\n");
     }
-    HalfEdgeMeshGL meshGL = LoadHalfEdgeMeshGL(mesh);
+    state.meshGL = LoadHalfEdgeMeshGL(state.mesh);
     printf("meshGL: va %d, vb %d, pid %d\n",
-        meshGL.vertexArray,
-        meshGL.vertexBuffer,
-        meshGL.programID);
+        state.meshGL.vertexArray,
+        state.meshGL.vertexBuffer,
+        state.meshGL.programID);
 
     glfwSetFramebufferSizeCallback(window, FramebufferSizeCallback);
     // Set up input handling.
     glfwSetCharModsCallback(window, &CharModsCallback);
     glfwSetKeyCallback(window, &KeyCallback);
     glfwSetMouseButtonCallback(window, &MouseCallback);
-
-    glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
 
     // Catch all GL errors before loop
     {
@@ -319,8 +388,8 @@ int main(int argc, char* argv[])
         }
     }
 
-    Vec3 cameraPos = { 0.0f, 0.0f, 5.0f };
-    Vec3 modelRotation = Vec3::zero;
+    state.cameraPos = { 0.0f, 0.0f, DEFAULT_CAM_Z };
+    state.modelRotation = { -0.5f, 0.6f, 0.3f };
 
     while (!glfwWindowShouldClose(window)) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -334,45 +403,45 @@ int main(int argc, char* argv[])
 
             if (keyInputBuffer[i].ascii == 'z'
             || keyInputBuffer[i].ascii == 'Z') {
-                cameraPos.z += ZOOM_STEP;
+                state.cameraPos.z += ZOOM_STEP;
             }
             if (keyInputBuffer[i].ascii == 'x'
             || keyInputBuffer[i].ascii == 'X') {
-                cameraPos.z -= ZOOM_STEP;
+                state.cameraPos.z -= ZOOM_STEP;
             }
 
             if (keyInputBuffer[i].ascii == 'a'
             || keyInputBuffer[i].ascii == 'A') {
-                modelRotation.y -= ROT_STEP;
+                state.modelRotation.y -= ROT_STEP;
             }
             if (keyInputBuffer[i].ascii == 'd'
             || keyInputBuffer[i].ascii == 'D') {
-                modelRotation.y += ROT_STEP;
+                state.modelRotation.y += ROT_STEP;
             }
             if (keyInputBuffer[i].ascii == 's'
             || keyInputBuffer[i].ascii == 'S') {
-                modelRotation.x -= ROT_STEP;
+                state.modelRotation.x -= ROT_STEP;
             }
             if (keyInputBuffer[i].ascii == 'w'
             || keyInputBuffer[i].ascii == 'W') {
-                modelRotation.x += ROT_STEP;
+                state.modelRotation.x += ROT_STEP;
             }
             if (keyInputBuffer[i].ascii == 'q'
             || keyInputBuffer[i].ascii == 'Q') {
-                modelRotation.z -= ROT_STEP;
+                state.modelRotation.z -= ROT_STEP;
             }
             if (keyInputBuffer[i].ascii == 'e'
             || keyInputBuffer[i].ascii == 'E') {
-                modelRotation.z += ROT_STEP;
+                state.modelRotation.z += ROT_STEP;
             }
         }
         // Clamp rotation angles
         for (int i = 0; i < 3; i++) {
-            while (modelRotation.e[i] < -PI_F) {
-                modelRotation.e[i] += 2.0f * PI_F;
+            while (state.modelRotation.e[i] < -PI_F) {
+                state.modelRotation.e[i] += 2.0f * PI_F;
             }
-            while (modelRotation.e[i] > PI_F) {
-                modelRotation.e[i] -= 2.0f * PI_F;
+            while (state.modelRotation.e[i] > PI_F) {
+                state.modelRotation.e[i] -= 2.0f * PI_F;
             }
         }
 
@@ -381,8 +450,8 @@ int main(int argc, char* argv[])
 
         Mat4 proj = Projection(110.0f, (float32)width_ / (float32)height_,
             0.1f, 10.0f);
-        Mat4 view = Translate(-cameraPos) * Rotate(modelRotation);
-        DrawHalfEdgeMeshGL(meshGL, proj, view);
+        Mat4 view = Translate(-state.cameraPos) * Rotate(state.modelRotation);
+        DrawHalfEdgeMeshGL(state.meshGL, proj, view);
 
         // Draw axis lines
         const float AXIS_LINE_LEN = 20.0f;
@@ -391,9 +460,8 @@ int main(int argc, char* argv[])
             v1.e[i] = -AXIS_LINE_LEN / 2.0f;
             Vec3 v2 = Vec3::zero;
             v2.e[i] = AXIS_LINE_LEN / 2.0f;
-            Vec4 color = Vec4::zero;
+            Vec4 color = { 0.2f, 0.2f, 0.2f, 1.0f };
             color.e[i] = 1.0f;
-            color.a = 1.0f;
 
             DrawLine(lineGL, proj, view, v1, v2, color);
         }
@@ -401,17 +469,18 @@ int main(int argc, char* argv[])
         glDisable(GL_DEPTH_TEST);
         // 3D rendering end
 
+#if 0
         { // Test draws (primitives & text)
-            /*Vec3 kmPos = { 100.0f, 100.0f, 0.0f };
+            Vec3 kmPos = { 100.0f, 100.0f, 0.0f };
             Vec2 kmSize = { 400.0f, 400.0f };
             DrawTexturedRect(texturedRectGL,
-                kmPos, Vec2::zero, kmSize, textureKM);*/
+                kmPos, Vec2::zero, kmSize, textureKM);
 
             Vec3 textPos = { 100.0f, 600.0f, 0.0f };
             Vec4 textColor = { 0.1f, 0.1f, 0.1f, 1.0f };
             const char* text = "The quick brown fox jumps over the lazy dog.";
-            int textWidth = GetTextWidth(cmSerif, text);
-            DrawText(textGL, cmSerif, text, textPos, textColor);
+            int textWidth = GetTextWidth(cmSerif32, text);
+            DrawText(textGL, cmSerif32, text, textPos, textColor);
             Vec3 underlinePos = textPos;
             underlinePos.y -= 2.0f;
             Vec2 underlineSize = { (float)textWidth, 1.0f };
@@ -421,7 +490,7 @@ int main(int argc, char* argv[])
             Vec3 symbolsPos = { 100.0f, 550.0f, 0.0f };
             Vec4 symbolsColor = { 0.1f, 0.5f, 0.25f, 1.0f };
             const char* symbols = "~`!@#$%^&*()-_=+\\|[]{}'\";:/.,<>???";
-            DrawText(textGL, cmSerif, symbols, symbolsPos, symbolsColor);
+            DrawText(textGL, cmSerif32, symbols, symbolsPos, symbolsColor);
 
             Vec3 paragraphPos = { 500.0f, 300.0f, 0.0f };
             Vec4 paragraphColor = { 0.1f, 0.1f, 0.1f, 1.0f };
@@ -431,11 +500,11 @@ int main(int argc, char* argv[])
                 "I want to see how far apart lines look by default.";
             const char* p3 =
                 "Probably best to have line heights be face heights.";
-            DrawText(textGL, cmSerif, p1, paragraphPos, paragraphColor);
+            DrawText(textGL, cmSerif32, p1, paragraphPos, paragraphColor);
             paragraphPos.y -= lineHeight;
-            DrawText(textGL, cmSerif, p2, paragraphPos, paragraphColor);
+            DrawText(textGL, cmSerif32, p2, paragraphPos, paragraphColor);
             paragraphPos.y -= lineHeight;
-            DrawText(textGL, cmSerif, p3, paragraphPos, paragraphColor);
+            DrawText(textGL, cmSerif32, p3, paragraphPos, paragraphColor);
 
             Vec3 titlePos = { 512.0f, 680.0f, 0.0f };
             Vec4 titleColor = { 0.1f, 0.1f, 0.1f, 1.0f };
@@ -463,6 +532,7 @@ int main(int argc, char* argv[])
             Vec4 rect42Color  = { 1.0f, 0.7f, 0.7f, 0.3f };
             DrawRect(rectGL, rect42Pos, Vec2::zero, rect42Size, rect42Color);
         }
+#endif
 
         { // Test GUI
             double mouseX, mouseY;
@@ -471,20 +541,23 @@ int main(int argc, char* argv[])
             Vec2 mousePos = { (float)mouseX, (float)mouseY };
 
             UpdateClickableBoxes(boxes.data, boxes.size, mousePos, clickState_);
-            UpdateButtons(buttons.data, buttons.size, mousePos, clickState_);
+            UpdateButtons(buttons.data, buttons.size, mousePos,
+                clickState_, &state);
             UpdateInputFields(fields.data, fields.size, mousePos, clickState_,
                 keyInputBuffer, keyInputBufferSize);
 
             DrawClickableBoxes(boxes.data, boxes.size, rectGL);
-            DrawButtons(buttons.data, buttons.size, rectGL, textGL, cmSerif);
-            DrawInputFields(fields.data, fields.size, rectGL, textGL, cmSerif);
+            DrawButtons(buttons.data, buttons.size,
+                rectGL, textGL, cmSerif);
+            DrawInputFields(fields.data, fields.size,
+                rectGL, textGL, cmSerif);
         }
 
         // Clear all key events
         keyInputBufferSize = 0;
 
         glfwSwapBuffers(window);
-        glfwWaitEvents();
+        glfwPollEvents();
         
         // Catch all GL errors during game loop
         {

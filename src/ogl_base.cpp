@@ -49,7 +49,7 @@ void InitOpenGL()
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
 
-    glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+    glClearColor(0.1f, 0.1f, 0.15f, 1.0f);
 }
 
 void ResizeGL(int width, int height)

@@ -22,8 +22,8 @@ ClickableBox CreateClickableBox(Vec2 origin, Vec2 size,
 }
 
 Button CreateButton(Vec2 origin, Vec2 size,
-    const char* text, ButtonCallback callback,
-    Vec4 color, Vec4 hoverColor, Vec4 pressColor)
+    const char* text, ButtonCallback callback, void* callbackData,
+    Vec4 color, Vec4 hoverColor, Vec4 pressColor, Vec4 textColor)
 {
     Button button = {};
     button.box = CreateClickableBox(origin, size,
@@ -33,12 +33,15 @@ Button CreateButton(Vec2 origin, Vec2 size,
     strncpy(button.text, text, textLen);
     button.text[textLen] = '\0';
     button.callback = callback;
+    button.callbackData = callbackData;
+
+    button.textColor = textColor;
 
     return button;
 }
 
 InputField CreateInputField(Vec2 origin, Vec2 size,
-    Vec4 color, Vec4 hoverColor, Vec4 pressColor)
+    Vec4 color, Vec4 hoverColor, Vec4 pressColor, Vec4 textColor)
 {
     InputField inputField = {};
     inputField.box = CreateClickableBox(origin, size,
@@ -46,6 +49,8 @@ InputField CreateInputField(Vec2 origin, Vec2 size,
 
     inputField.text[0] = '\0';
     inputField.textLen = 0;
+
+    inputField.textColor = textColor;
 
     return inputField;
 }
@@ -85,14 +90,16 @@ void DrawClickableBoxes(ClickableBox boxes[], uint32 n, RectGL rectGL)
     }
 }
 
-void UpdateButtons(Button buttons[], uint32 n, Vec2 mousePos, int clickState)
+void UpdateButtons(Button buttons[], uint32 n,
+    Vec2 mousePos, int clickState, SharedState* state)
 {
     for (uint32 i = 0; i < n; i++) {
         bool wasPressed = buttons[i].box.pressed;
-        UpdateClickableBoxes(&buttons[i].box, n, mousePos, clickState);
+        // TODO unfortunate... SOA would be cool
+        UpdateClickableBoxes(&buttons[i].box, 1, mousePos, clickState);
 
         if (buttons[i].box.hovered && wasPressed && !buttons[i].box.pressed) {
-            buttons[i].callback();
+            buttons[i].callback(state, buttons[i].callbackData);
         }
     }
 }
@@ -101,11 +108,12 @@ void DrawButtons(Button buttons[], uint32 n,
     RectGL rectGL, TextGL textGL, const FontFace& face)
 {
     for (uint32 i = 0; i < n; i++) {
-        DrawClickableBoxes(&buttons[i].box, n, rectGL);
+        DrawClickableBoxes(&buttons[i].box, 1, rectGL);
         Vec3 textPos = {
             buttons[i].box.origin.x, buttons[i].box.origin.y, 0.0f
         };
-        DrawText(textGL, face, buttons[i].text, textPos, Vec4::black);
+        DrawText(textGL, face, buttons[i].text,
+            textPos, buttons[i].textColor);
     }
 }
 
@@ -115,7 +123,7 @@ void UpdateInputFields(InputField fields[], uint32 n,
     static int focus = -1;
     bool anyPressed = false;
     for (uint32 i = 0; i < n; i++) {
-        UpdateClickableBoxes(&fields[i].box, n, mousePos, clickState);
+        UpdateClickableBoxes(&fields[i].box, 1, mousePos, clickState);
         
         if (fields[i].box.pressed) {
             // TODO picks the last one for now. sort based on Z
@@ -164,8 +172,8 @@ void DrawInputFields(InputField fields[], uint32 n,
     RectGL rectGL, TextGL textGL, const FontFace& face)
 {
     for (uint32 i = 0; i < n; i++) {
-        DrawClickableBoxes(&fields[i].box, n, rectGL);
+        DrawClickableBoxes(&fields[i].box, 1, rectGL);
         Vec3 textPos = { fields[i].box.origin.x, fields[i].box.origin.y, 0.0f };
-        DrawText(textGL, face, fields[i].text, textPos, Vec4::black);
+        DrawText(textGL, face, fields[i].text, textPos, fields[i].textColor);
     }
 }

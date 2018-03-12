@@ -18,6 +18,8 @@ struct ReadFileResult
     void* data;
 };
 
+struct SharedState;
+
 char* GetAppPath();
 void CatStrings(const char* str1, const char* str2, char* dest, uint64 destLen);
 // Reads entire contents of file into memory.
