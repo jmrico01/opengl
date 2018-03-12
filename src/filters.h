@@ -14,9 +14,12 @@ typedef void (*FilterApplyFunc)(FilterEntry*, SharedState*);
 
 struct FilterEntry
 {
+    int idx;
+    const char* name;
     FilterUpdateFunc updateFunc;
     FilterApplyFunc applyFunc;
-    void* data; // data struct
+    Button removeButton;
+    void* data; // data struct, malloc'd
 };
 
 void FilterUpdateModelLoad(FilterEntry* entry, Vec3 pos,
@@ -50,6 +53,7 @@ void FilterTranslate(FilterEntry* entry, SharedState* state);
 
 struct RotateData
 {
+    InputField inputCoords[3];
     Vec3 rot;
 };
 void FilterRotate(FilterEntry* entry, SharedState* state);
@@ -75,3 +79,4 @@ struct FilterInfo {
 const int numFilters_ = sizeof(filterInfo_) / sizeof(filterInfo_[0]);
 
 global_var DynamicArray<FilterEntry> filters_;
+global_var DynamicArray<int> filtersToDelete_;

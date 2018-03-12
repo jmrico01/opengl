@@ -67,6 +67,12 @@ void DynamicArray<T>::Remove(uint32 idx)
 }
 
 template <typename T>
+void DynamicArray<T>::Clear()
+{
+    size = 0;
+}
+
+template <typename T>
 void DynamicArray<T>::Free()
 {
     free(data);

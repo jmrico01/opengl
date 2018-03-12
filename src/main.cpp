@@ -276,8 +276,10 @@ int main(int argc, char* argv[])
     
     const char* MODEL_START = "cube.obj";
     filters_.Init();
-    { // Create model loading filter
+    { // Manually add model loading filter
         FilterEntry modelLoadFilter;
+        modelLoadFilter.idx = -1;
+        modelLoadFilter.name = "Load 3D Model (.obj)";
         modelLoadFilter.updateFunc = FilterUpdateModelLoad;
         modelLoadFilter.applyFunc = FilterModelLoad;
 
@@ -430,6 +432,25 @@ int main(int argc, char* argv[])
                 mousePos, clickState_, keyInputBuffer, keyInputBufferSize);
         }
 
+        if (filtersToDelete_.size > 0) {
+            for (uint32 i = 0; i < filtersToDelete_.size; i++) {
+                FilterEntry entry = filters_[filtersToDelete_[i]];
+                if (filtersToDelete_[i] != entry.idx) {
+                    printf("ERROR: filter indices didn't match on deletion\n");
+                }
+
+                printf("Removing filter #%d: %s\n", entry.idx, entry.name);
+                for (uint32 j = entry.idx + 1; j < filters_.size; j++) {
+                    filters_[j].idx -= 1;
+                }
+                // Free memory
+                free(entry.data);
+                filters_.Remove(entry.idx);
+            }
+
+            filtersToDelete_.Clear();
+        }
+
         enterStatePrev = enterState;
         enterState = glfwGetKey(window, GLFW_KEY_ENTER);
         if (enterState == GLFW_PRESS && enterStatePrev == GLFW_RELEASE) {
@@ -437,6 +458,9 @@ int main(int argc, char* argv[])
             for (uint32 i = 0; i < filters_.size; i++) {
                 filters_[i].applyFunc(&filters_[i], &state);
             }
+            printf("-> Reloading mesh into OpenGL...\n");
+            FreeHalfEdgeMeshGL(state.meshGL);
+            state.meshGL = LoadHalfEdgeMeshGL(state.mesh);
             printf("=> DONE!\n");
         }
 

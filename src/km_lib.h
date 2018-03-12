@@ -12,6 +12,7 @@ struct DynamicArray
     void Append(T element);
     // Slow, linear time
     void Remove(uint32 idx);
+    void Clear();
     void Free();
 
     // TODO make inline
