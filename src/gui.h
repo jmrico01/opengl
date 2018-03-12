@@ -13,13 +13,9 @@ enum ClickStateFlags {
     CLICKSTATE_RIGHT_PRESS = 1 << 1
 };
 
-/*struct ClickState
-{
-    bool leftPressed;
-    bool rightPressed;
-};*/
+struct Button;
 
-typedef void (*ButtonCallback)(SharedState*, void*);
+typedef void (*ButtonCallback)(Button*, void*);
 
 struct ClickableBox
 {
@@ -39,7 +35,6 @@ struct Button
     ClickableBox box;
     char text[INPUT_BUFFER_SIZE];
     ButtonCallback callback;
-    void* callbackData;
     Vec4 textColor;
 };
 
@@ -54,7 +49,7 @@ struct InputField
 ClickableBox CreateClickableBox(Vec2 origin, Vec2 size,
     Vec4 color, Vec4 hoverColor, Vec4 pressColor);
 Button CreateButton(Vec2 origin, Vec2 size,
-    const char* text, ButtonCallback callback, void* callbackData,
+    const char* text, ButtonCallback callback,
     Vec4 color, Vec4 hoverColor, Vec4 pressColor, Vec4 textColor);
 InputField CreateInputField(Vec2 origin, Vec2 size,
     Vec4 color, Vec4 hoverColor, Vec4 pressColor, Vec4 textColor);
@@ -64,7 +59,7 @@ void UpdateClickableBoxes(ClickableBox boxes[], uint32 n,
 void DrawClickableBoxes(ClickableBox boxes[], uint32 n, RectGL rectGL);
 
 void UpdateButtons(Button buttons[], uint32 n,
-    Vec2 mousePos, int clickState, SharedState* state);
+    Vec2 mousePos, int clickState, void* data);
 void DrawButtons(Button buttons[], uint32 n,
     RectGL rectGL, TextGL textGL, const FontFace& face);
 

@@ -12,6 +12,8 @@ union Vec2
 {
     const static Vec2 zero;
     const static Vec2 one;
+    const static Vec2 unitX;
+    const static Vec2 unitY;
 
 	struct
 	{
@@ -24,6 +26,9 @@ union Vec3
 {
     const static Vec3 zero;
     const static Vec3 one;
+    const static Vec3 unitX;
+    const static Vec3 unitY;
+    const static Vec3 unitZ;
 
 	struct
 	{
@@ -41,6 +46,9 @@ union Vec4
     const static Vec4 zero;
     const static Vec4 one;
     const static Vec4 black;
+    const static Vec4 red;
+    const static Vec4 green;
+    const static Vec4 blue;
 
 	struct
 	{
@@ -63,6 +71,7 @@ union Vec4
 */
 struct Mat4
 {
+    const static Mat4 zero;
 	const static Mat4 one;
 
 	float32 e[4][4];
@@ -86,6 +95,12 @@ const Vec2 Vec2::zero = {
 };
 const Vec2 Vec2::one = {
     1.0f, 1.0f
+};
+const Vec2 Vec2::unitX = {
+    1.0f, 0.0f
+};
+const Vec2 Vec2::unitY = {
+    0.0f, 1.0f
 };
 
 inline Vec2 operator-(Vec2 v)
@@ -181,6 +196,15 @@ const Vec3 Vec3::zero = {
 };
 const Vec3 Vec3::one = {
     1.0f, 1.0f, 1.0f
+};
+const Vec3 Vec3::unitX = {
+    1.0f, 0.0f, 0.0f
+};
+const Vec3 Vec3::unitY = {
+    0.0f, 1.0f, 0.0f
+};
+const Vec3 Vec3::unitZ = {
+    0.0f, 0.0f, 1.0f
 };
 
 inline Vec3 operator-(Vec3 v)
@@ -293,6 +317,15 @@ const Vec4 Vec4::one = {
 const Vec4 Vec4::black = {
     0.0f, 0.0f, 0.0f, 1.0f
 };
+const Vec4 Vec4::red = {
+    1.0f, 0.0f, 0.0f, 1.0f
+};
+const Vec4 Vec4::green = {
+    0.0f, 1.0f, 0.0f, 1.0f
+};
+const Vec4 Vec4::blue = {
+    0.0f, 0.0f, 1.0f, 1.0f
+};
 
 inline Vec4 operator-(Vec4 v)
 {
@@ -383,6 +416,13 @@ const Mat4 Mat4::one =
 	0, 0, 1, 0,
 	0, 0, 0, 1
 };
+const Mat4 Mat4::zero =
+{
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0
+};
 
 inline Mat4 operator+(Mat4 m1, Mat4 m2)
 {
@@ -420,15 +460,32 @@ inline Mat4& operator-=(Mat4& m1, Mat4 m2)
 
 inline Mat4 operator*(Mat4 m1, Mat4 m2)
 {
-	Mat4 result = {};
+	Mat4 result = Mat4::zero;
 
 	// I really thought hard about this
 	// Make it as cache-efficient as possible
 	// Probably doesn't matter at all...
-	for (int colM2 = 0; colM2 < 4; colM2++)
-		for (int colM1 = 0; colM1 < 4; colM1++)
-			for (int rowM1 = 0; rowM1 < 4; rowM1++)
-				result.e[colM2][rowM1] += m2.e[colM2][colM1] * m1.e[colM1][rowM1];
+	for (int colM2 = 0; colM2 < 4; colM2++) {
+		for (int colM1 = 0; colM1 < 4; colM1++) {
+			for (int rowM1 = 0; rowM1 < 4; rowM1++) {
+				result.e[colM2][rowM1] += 
+                    m2.e[colM2][colM1] * m1.e[colM1][rowM1];
+            }
+        }
+    }
+
+	return result;
+}
+
+inline Vec4 operator*(Mat4 m, Vec4 v)
+{
+	Vec4 result = Vec4::zero;
+
+    for (int row = 0; row < 4; row++) {
+        for (int col = 0; col < 4; col++) {
+            result.e[row] += m.e[col][row] * v.e[col];
+        }
+    }
 
 	return result;
 }
@@ -532,6 +589,25 @@ inline Quat operator*(Quat q1, Quat q2)
 	return result;
 }
 
+inline float32 MagSq(Quat q)
+{
+	return q.x*q.x + q.y*q.y + q.z*q.z + q.w*q.w;
+}
+inline float32 Mag(Quat q)
+{
+	return sqrtf(MagSq(q));
+}
+inline Quat Normalize(Quat q)
+{
+    Quat result = q;
+    float32 mag = Mag(q);
+    result.x /= mag;
+    result.y /= mag;
+    result.z /= mag;
+    result.w /= mag;
+    return result;
+}
+
 // Returns a new quaternion qInv such that q * qInv = Quat::one
 inline Quat Inverse(Quat q)
 {
@@ -547,19 +623,17 @@ inline Quat Inverse(Quat q)
 inline Vec3 operator*(Quat q, Vec3 v)
 {
 	// Treat v as a quaternion with w = 0
-	Quat qv;
-	qv.x = q.w*v.x + q.y*v.z - q.z*v.y;
+	Quat vQuat = { v.x, v.y, v.z, 0.0f };
+	/*qv.x = q.w*v.x + q.y*v.z - q.z*v.y;
 	qv.y = q.w*v.y + q.z*v.x - q.x*v.z;
 	qv.z = q.w*v.z + q.x*v.y - q.y*v.x;
-	qv.w = -q.x*v.x - q.y*v.y - q.z*v.z;
+	qv.w = -q.x*v.x - q.y*v.y - q.z*v.z;*/
+    Quat qv = q * vQuat;
 
 	Quat qInv = Inverse(q);
 	Quat qvqInv = qv * qInv;
 
-	Vec3 result;
-	result.x = qvqInv.x;
-	result.y = qvqInv.y;
-	result.z = qvqInv.z;
+	Vec3 result = { qvqInv.x, qvqInv.y, qvqInv.z };
 	return result;
 }
 
@@ -618,11 +692,11 @@ Mat4 UnitQuatToMat4(Quat q)
 
 	result.e[1][0] = 2.0f * (q.x*q.y - q.w*q.z);
 	result.e[1][1] = 1.0f - 2.0f * (q.x*q.x + q.z*q.z);
-	result.e[1][2] = 2.0f * (q.y*q.z - q.w*q.x);
+	result.e[1][2] = 2.0f * (q.y*q.z + q.w*q.x);
 	result.e[1][3] = 0.0f;
 
 	result.e[2][0] = 2.0f * (q.x*q.z + q.w*q.y);
-	result.e[2][1] = 2.0f * (q.y*q.z + q.w*q.x);
+	result.e[2][1] = 2.0f * (q.y*q.z - q.w*q.x);
 	result.e[2][2] = 1.0f - 2.0f * (q.x*q.x + q.y*q.y);
 	result.e[2][3] = 0.0f;
 

@@ -22,7 +22,7 @@ ClickableBox CreateClickableBox(Vec2 origin, Vec2 size,
 }
 
 Button CreateButton(Vec2 origin, Vec2 size,
-    const char* text, ButtonCallback callback, void* callbackData,
+    const char* text, ButtonCallback callback,
     Vec4 color, Vec4 hoverColor, Vec4 pressColor, Vec4 textColor)
 {
     Button button = {};
@@ -33,7 +33,6 @@ Button CreateButton(Vec2 origin, Vec2 size,
     strncpy(button.text, text, textLen);
     button.text[textLen] = '\0';
     button.callback = callback;
-    button.callbackData = callbackData;
 
     button.textColor = textColor;
 
@@ -91,7 +90,7 @@ void DrawClickableBoxes(ClickableBox boxes[], uint32 n, RectGL rectGL)
 }
 
 void UpdateButtons(Button buttons[], uint32 n,
-    Vec2 mousePos, int clickState, SharedState* state)
+    Vec2 mousePos, int clickState, void* data)
 {
     for (uint32 i = 0; i < n; i++) {
         bool wasPressed = buttons[i].box.pressed;
@@ -99,7 +98,7 @@ void UpdateButtons(Button buttons[], uint32 n,
         UpdateClickableBoxes(&buttons[i].box, 1, mousePos, clickState);
 
         if (buttons[i].box.hovered && wasPressed && !buttons[i].box.pressed) {
-            buttons[i].callback(state, buttons[i].callbackData);
+            buttons[i].callback(&buttons[i], data);
         }
     }
 }
@@ -126,8 +125,8 @@ void UpdateInputFields(InputField fields[], uint32 n,
         UpdateClickableBoxes(&fields[i].box, 1, mousePos, clickState);
         
         if (fields[i].box.pressed) {
-            // TODO picks the last one for now. sort based on Z
-            printf("new input focus: %d\n", i);
+            // TODO picks the last one for now. sort based on Z?
+            //printf("new input focus: %d\n", i);
             focus = i;
             anyPressed = true;
         }
@@ -135,36 +134,36 @@ void UpdateInputFields(InputField fields[], uint32 n,
 
     if (focus != -1 && (clickState & CLICKSTATE_LEFT_PRESS) != 0
     && !anyPressed) {
-        printf("lost focus\n");
+        //printf("lost focus\n");
         focus = -1;
     }
 
     // TODO mysterious bug: can't type in more than 16 characters...
     if (focus != -1 && keyBufSize != 0) {
-        printf("size: %d\n", (int)sizeof(fields[focus]));
+        //printf("size: %d\n", (int)sizeof(fields[focus]));
         for (uint32 i = 0; i < keyBufSize; i++) {
             if (!keyBuf[i].pressed) {
                 continue;
             }
 
             if (keyBuf[i].ascii == 8) {
-                printf(">> backspaced\n");
+                //printf(">> backspaced\n");
                 if (fields[focus].textLen > 0) {
                     fields[focus].textLen--;
                 }
             }
             else if (fields[focus].textLen < INPUT_BUFFER_SIZE - 1) {
-                printf("added %c\n", keyBuf[i].ascii);
-                printf("textLen before: %d\n", fields[focus].textLen);
+                //printf("added %c\n", keyBuf[i].ascii);
+                //printf("textLen before: %d\n", fields[focus].textLen);
                 fields[focus].text[fields[focus].textLen++] = keyBuf[i].ascii;
             }
         }
         fields[focus].text[fields[focus].textLen] = '\0';
-        printf("new focus (%d) length: %d\n", focus, fields[focus].textLen);
+        //printf("new focus (%d) length: %d\n", focus, fields[focus].textLen);
         for (uint32 i = 0; i < fields[focus].textLen; i++) {
-            printf("chardump: %c\n", fields[focus].text[i]);
+            //printf("chardump: %c\n", fields[focus].text[i]);
         }
-        printf("new text: %s\n", fields[focus].text);
+        //printf("new text: %s\n", fields[focus].text);
     }
 }
 

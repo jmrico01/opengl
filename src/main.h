@@ -1,6 +1,12 @@
 #pragma once
 
+#ifdef _WIN32
+#define GLEW_STATIC     // required by Windows
+#include <Windows.h>    // ensure this is included before GLFW
+#endif
+
 #include "km_types.h"
+#include "halfedge.h"
 
 // TODO get rid of this
 #define PATH_MAX_LENGTH 512
@@ -18,7 +24,16 @@ struct ReadFileResult
     void* data;
 };
 
-struct SharedState;
+struct SharedState
+{
+    Vec3 cameraPos;
+    Quat modelRot;
+
+    HalfEdgeMesh mesh;
+    HalfEdgeMeshGL meshGL;
+
+    //DynamicArray
+};
 
 char* GetAppPath();
 void CatStrings(const char* str1, const char* str2, char* dest, uint64 destLen);

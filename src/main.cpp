@@ -1,10 +1,5 @@
 #include "main.h"
 
-#ifdef _WIN32
-#define GLEW_STATIC     // required by Windows
-#include <Windows.h>    // ensure this is included before GLFW
-#endif
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <GL/glew.h>
@@ -20,6 +15,9 @@
 #include "gui.h"
 #include "load_bmp.h"
 #include "halfedge.h"
+#include "filters.h"
+
+#define DEFAULT_CAM_Z 4.0f
 
 // TODO (on linux at least) the window's top bar is part
 // of the viewport, so the render scene is cropped.
@@ -29,6 +27,7 @@ global_var char pathToApp_[PATH_MAX_LENGTH];
 global_var int width_ = 1024;
 global_var int height_ = 768;
 global_var int clickState_ = CLICKSTATE_NONE;
+global_var float scrollCumY_ = 0.0f;
 
 global_var KeyEvent keyInputBuffer[KEY_INPUT_BUFFER_MAX];
 global_var uint32 keyInputBufferSize = 0;
@@ -121,6 +120,11 @@ internal void MouseCallback(GLFWwindow* window,
         }
     }
 }
+internal void ScrollCallback(GLFWwindow* window,
+    double xOffset, double yOffset)
+{
+    scrollCumY_ += (float)yOffset;
+}
 
 internal void FramebufferSizeCallback(
     GLFWwindow* window, int width, int height)
@@ -183,50 +187,10 @@ ReadFileResult ReadFile(const char* path)
     return result;
 }
 
-#define DEFAULT_CAM_Z 4.0f
-
-struct SharedState
-{
-    Vec3 cameraPos;
-    Vec3 modelRotation;
-
-    HalfEdgeMesh mesh;
-    HalfEdgeMeshGL meshGL;
-};
-
-void CallbackEmpty(SharedState* state, void* data)
-{
-}
-
-void ReloadMesh(SharedState* state)
-{
-    FreeHalfEdgeMeshGL(state->meshGL);
-    state->meshGL = LoadHalfEdgeMeshGL(state->mesh);
-}
-
 void FuncResetView(SharedState* state, void* data)
 {
     state->cameraPos = { 0.0f, 0.0f, DEFAULT_CAM_Z };
-    state->modelRotation = { -0.5f, 0.6f, 0.3f };
-}
-
-void FuncTranslate(SharedState* state, void* data)
-{
-    // TODO grab this from void* data.
-    Vec3 offset = { 1.0f, 0.0f, 1.0f };
-    for (uint32 i = 0; i < state->mesh.vertices.size; i++) {
-        state->mesh.vertices[i].pos += offset;
-    }
-
-    ReloadMesh(state);
-}
-void FuncRotate(SharedState* state, void* data)
-{
-    printf("Rotate\n");
-}
-void FuncScale(SharedState* state, void* data)
-{
-    printf("Scale\n");
+    state->modelRot = Quat::one;
 }
 
 int main(int argc, char* argv[])
@@ -299,6 +263,8 @@ int main(int argc, char* argv[])
     LineGL lineGL = CreateLineGL();
 
     //GLuint textureKM = OpenGLLoadBMP("data/images/kapricorn.bmp");
+    FontFace cmSerif16 = LoadFontFace(
+        library, "data/fonts/computer-modern/serif.ttf", 16);
     FontFace cmSerif = LoadFontFace(
         library, "data/fonts/computer-modern/serif.ttf", 24);
     /*FontFace cmSerif32 = LoadFontFace(
@@ -308,58 +274,41 @@ int main(int argc, char* argv[])
     FontFace cmSerifBold128 = LoadFontFace(
         library, "data/fonts/computer-modern/serif-bold.ttf", 128);*/
 
-    struct FunctionInfo {
-        const char* name;
-        ButtonCallback callback;
-        void* data;
-    } functions[] = {
-        { "Reset View", FuncResetView },
-        { "",           CallbackEmpty },
-        { "Translate",  FuncTranslate },
-        { "Rotate",     FuncRotate },
-        { "Scale",      FuncScale },
-        { "",           CallbackEmpty },
-        { "Twist",      CallbackEmpty },
-        { "Inflate",    CallbackEmpty },
-        { "Wacky",      CallbackEmpty }
-    };
-    const int numFuncs = sizeof(functions) / sizeof(functions[0]);
-
     DynamicArray<ClickableBox> boxes;
     boxes.Init();
-    DynamicArray<Button> buttons;
-    buttons.Init();
     DynamicArray<InputField> fields;
     fields.Init();
-    {
-        /*Vec2 guiBoxOrigin = { 100.0f, 100.0f };
-        Vec2 guiBoxSize = { 100.0f, 80.0f };
-        boxes.Append(CreateClickableBox(guiBoxOrigin, guiBoxSize));
+    // Nothing in these, for now
 
-        Vec2 fieldOrigin = { 250.0f, 100.0f };
-        Vec2 fieldSize = { 400.0f, 32.0f };
-        fields.Append(CreateInputField(fieldOrigin, fieldSize));
-        fieldOrigin = { 250.0f, 200.0f };
-        fields.Append(CreateInputField(fieldOrigin, fieldSize));
-        fieldOrigin = { 250.0f, 300.0f };
-        fields.Append(CreateInputField(fieldOrigin, fieldSize));*/
+    struct FilterInfo {
+        const char* name;
+        ButtonCallback callback;
+    } filterInfo[] = {
+        { "Translate",  FilterButtonTranslate },
+        { "Rotate",     FilterButtonRotate },
+        { "Scale",      FilterButtonScale },
+        { "",           FilterButtonNone },
+        { "Twist",      FilterButtonNone },
+        { "Inflate",    FilterButtonNone },
+        { "Wacky",      FilterButtonNone }
+    };
+    const int numFilters = sizeof(filterInfo) / sizeof(filterInfo[0]);
 
-        for (int i = 0; i < numFuncs; i++) {
-            Vec2 origin = { 10.0f, 10.0f + 1.1f * cmSerif.height * (i + 1) };
-            Vec2 size = {
-                (float32)GetTextWidth(cmSerif, functions[i].name),
-                (float32)cmSerif.height
-            };
-            FunctionInfo fi = functions[i];
-            Button button = CreateButton(origin, size,
-                fi.name, fi.callback, nullptr,
-                Vec4 {1.0f, 1.0f, 0.0f, 0.2f},
-                Vec4 {1.0f, 1.0f, 0.0f, 0.5f},
-                Vec4 {1.0f, 1.0f, 0.0f, 0.8f},
-                Vec4 {0.8f, 0.8f, 0.8f, 1.0f}
-            );
-            buttons.Append(button);
-        }
+    DynamicArray<Button> filterButtons;
+    filterButtons.Init();
+    for (int i = 0; i < numFilters; i++) {
+        Vec2 origin = { 10.0f, 10.0f + 1.1f * cmSerif.height * i };
+        Vec2 size = {
+            (float32)GetTextWidth(cmSerif, filterInfo[i].name),
+            (float32)cmSerif.height
+        };
+        filterButtons.Append(CreateButton(origin, size,
+            filterInfo[i].name, filterInfo[i].callback,
+            { 1.0f, 1.0f, 0.0f, 0.2f },
+            { 1.0f, 1.0f, 0.0f, 0.5f },
+            { 1.0f, 1.0f, 0.0f, 0.6f },
+            { 0.8f, 0.8f, 0.8f, 1.0f }
+        ));
     }
 
     SharedState state;
@@ -379,6 +328,7 @@ int main(int argc, char* argv[])
     glfwSetCharModsCallback(window, &CharModsCallback);
     glfwSetKeyCallback(window, &KeyCallback);
     glfwSetMouseButtonCallback(window, &MouseCallback);
+    glfwSetScrollCallback(window, &ScrollCallback);
 
     // Catch all GL errors before loop
     {
@@ -388,69 +338,43 @@ int main(int argc, char* argv[])
         }
     }
 
+    Vec2 mousePos = Vec2::zero, mousePosPrev = Vec2::zero;
+
     state.cameraPos = { 0.0f, 0.0f, DEFAULT_CAM_Z };
-    state.modelRotation = { -0.5f, 0.6f, 0.3f };
+    state.modelRot = Quat::one;
 
     while (!glfwWindowShouldClose(window)) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        for (uint32 i = 0; i < keyInputBufferSize; i++) {
-            if (!keyInputBuffer[i].pressed) {
-                continue;
-            }
-            const float ZOOM_STEP = 0.8f;
-            const float ROT_STEP = 0.1f;
-
-            if (keyInputBuffer[i].ascii == 'z'
-            || keyInputBuffer[i].ascii == 'Z') {
-                state.cameraPos.z += ZOOM_STEP;
-            }
-            if (keyInputBuffer[i].ascii == 'x'
-            || keyInputBuffer[i].ascii == 'X') {
-                state.cameraPos.z -= ZOOM_STEP;
-            }
-
-            if (keyInputBuffer[i].ascii == 'a'
-            || keyInputBuffer[i].ascii == 'A') {
-                state.modelRotation.y -= ROT_STEP;
-            }
-            if (keyInputBuffer[i].ascii == 'd'
-            || keyInputBuffer[i].ascii == 'D') {
-                state.modelRotation.y += ROT_STEP;
-            }
-            if (keyInputBuffer[i].ascii == 's'
-            || keyInputBuffer[i].ascii == 'S') {
-                state.modelRotation.x -= ROT_STEP;
-            }
-            if (keyInputBuffer[i].ascii == 'w'
-            || keyInputBuffer[i].ascii == 'W') {
-                state.modelRotation.x += ROT_STEP;
-            }
-            if (keyInputBuffer[i].ascii == 'q'
-            || keyInputBuffer[i].ascii == 'Q') {
-                state.modelRotation.z -= ROT_STEP;
-            }
-            if (keyInputBuffer[i].ascii == 'e'
-            || keyInputBuffer[i].ascii == 'E') {
-                state.modelRotation.z += ROT_STEP;
-            }
+        // Get mouse position
+        {
+            double mouseX, mouseY;
+            glfwGetCursorPos(window, &mouseX, &mouseY);
+            mouseY = (double)height_ - mouseY;
+            mousePosPrev = mousePos;
+            mousePos = { (float)mouseX, (float)mouseY };
         }
-        // Clamp rotation angles
-        for (int i = 0; i < 3; i++) {
-            while (state.modelRotation.e[i] < -PI_F) {
-                state.modelRotation.e[i] += 2.0f * PI_F;
-            }
-            while (state.modelRotation.e[i] > PI_F) {
-                state.modelRotation.e[i] -= 2.0f * PI_F;
-            }
+
+        const float ZOOM_STEP = 0.95f;
+        if ((clickState_ & CLICKSTATE_LEFT_PRESS) != 0) {
+            Vec2 dMouse = mousePos - mousePosPrev;
+            float speed = 0.01f;
+            state.modelRot =
+                QuatFromAngleUnitAxis(dMouse.x * speed, Vec3::unitY)
+                * QuatFromAngleUnitAxis(-dMouse.y * speed, Vec3::unitX)
+                * state.modelRot;
+            state.modelRot = Normalize(state.modelRot);
         }
+        state.cameraPos.z = DEFAULT_CAM_Z * powf(ZOOM_STEP, scrollCumY_);
 
         // 3D rendering start
         glEnable(GL_DEPTH_TEST);
 
         Mat4 proj = Projection(110.0f, (float32)width_ / (float32)height_,
             0.1f, 10.0f);
-        Mat4 view = Translate(-state.cameraPos) * Rotate(state.modelRotation);
+        //Mat4 view = Translate(-state.cameraPos) * Rotate(state.modelRotation);
+        Mat4 view = Translate(-state.cameraPos)
+            * UnitQuatToMat4(state.modelRot);
         DrawHalfEdgeMeshGL(state.meshGL, proj, view);
 
         // Draw axis lines
@@ -469,88 +393,74 @@ int main(int argc, char* argv[])
         glDisable(GL_DEPTH_TEST);
         // 3D rendering end
 
-#if 0
-        { // Test draws (primitives & text)
-            Vec3 kmPos = { 100.0f, 100.0f, 0.0f };
-            Vec2 kmSize = { 400.0f, 400.0f };
-            DrawTexturedRect(texturedRectGL,
-                kmPos, Vec2::zero, kmSize, textureKM);
+        UpdateClickableBoxes(boxes.data, boxes.size, mousePos, clickState_);
+        /*UpdateInputFields(fields.data, fields.size, mousePos, clickState_,
+            keyInputBuffer, keyInputBufferSize);*/
 
-            Vec3 textPos = { 100.0f, 600.0f, 0.0f };
-            Vec4 textColor = { 0.1f, 0.1f, 0.1f, 1.0f };
-            const char* text = "The quick brown fox jumps over the lazy dog.";
-            int textWidth = GetTextWidth(cmSerif32, text);
-            DrawText(textGL, cmSerif32, text, textPos, textColor);
-            Vec3 underlinePos = textPos;
-            underlinePos.y -= 2.0f;
-            Vec2 underlineSize = { (float)textWidth, 1.0f };
-            DrawRect(rectGL,
-                underlinePos, Vec2::zero, underlineSize, textColor);
-
-            Vec3 symbolsPos = { 100.0f, 550.0f, 0.0f };
-            Vec4 symbolsColor = { 0.1f, 0.5f, 0.25f, 1.0f };
-            const char* symbols = "~`!@#$%^&*()-_=+\\|[]{}'\";:/.,<>???";
-            DrawText(textGL, cmSerif32, symbols, symbolsPos, symbolsColor);
-
-            Vec3 paragraphPos = { 500.0f, 300.0f, 0.0f };
-            Vec4 paragraphColor = { 0.1f, 0.1f, 0.1f, 1.0f };
-            float lineHeight = 32.0f;
-            const char* p1 = "This is a line spacing test.";
-            const char* p2 =
-                "I want to see how far apart lines look by default.";
-            const char* p3 =
-                "Probably best to have line heights be face heights.";
-            DrawText(textGL, cmSerif32, p1, paragraphPos, paragraphColor);
-            paragraphPos.y -= lineHeight;
-            DrawText(textGL, cmSerif32, p2, paragraphPos, paragraphColor);
-            paragraphPos.y -= lineHeight;
-            DrawText(textGL, cmSerif32, p3, paragraphPos, paragraphColor);
-
-            Vec3 titlePos = { 512.0f, 680.0f, 0.0f };
-            Vec4 titleColor = { 0.1f, 0.1f, 0.1f, 1.0f };
-            Vec2 titleAnchor = { 0.5f, 0.0f };
-            const char* title = "OpenGL";
-            DrawText(textGL,
-                cmSerifBold, title, titlePos, titleAnchor, titleColor);
-            int titleWidth = GetTextWidth(cmSerifBold, title);
-            Vec2 titleBackgroundSize = { (float)titleWidth, 48.0f };
-            Vec4 titleBackgroundColor = { 0.0f, 0.0f, 0.0f, 0.2f };
-            DrawRect(rectGL,
-                titlePos, titleAnchor, titleBackgroundSize,
-                titleBackgroundColor);
-            // TODO this is pixelated. Check why.
-            // pos: { 512.0f, 680.0f, 0.0f };
-            // anchor: { 0.5f, 0.0f }
-            // text: "PRINCE"
-            // font: cm serif bold, 48
-            titlePos.y -= 128.0f;
-            DrawText(textGL,
-                cmSerifBold128, "HUGE", titlePos, titleAnchor, titleColor);
-
-            Vec3 rect42Pos    = { 400.0f, 50.0f, 0.0f };
-            Vec2 rect42Size   = { 800.0f, 300.0f };
-            Vec4 rect42Color  = { 1.0f, 0.7f, 0.7f, 0.3f };
-            DrawRect(rectGL, rect42Pos, Vec2::zero, rect42Size, rect42Color);
+        for (uint32 i = 0; i < filterButtons.size; i++) {
+            UpdateButtons(&filterButtons[i], 1, mousePos,
+                clickState_, &filterButtons[i].text);
         }
-#endif
 
-        { // Test GUI
-            double mouseX, mouseY;
-            glfwGetCursorPos(window, &mouseX, &mouseY);
-            mouseY = (double)height_ - mouseY;
-            Vec2 mousePos = { (float)mouseX, (float)mouseY };
+        DrawClickableBoxes(boxes.data, boxes.size, rectGL);
+        DrawInputFields(fields.data, fields.size,
+            rectGL, textGL, cmSerif);
 
-            UpdateClickableBoxes(boxes.data, boxes.size, mousePos, clickState_);
-            UpdateButtons(buttons.data, buttons.size, mousePos,
-                clickState_, &state);
-            UpdateInputFields(fields.data, fields.size, mousePos, clickState_,
+        DrawButtons(filterButtons.data, filterButtons.size,
+            rectGL, textGL, cmSerif);
+
+        {
+            Vec3 filterOrigin = { 150.0f, 60.0f, 0.0f };
+
+            static DynamicArray<InputField> args;
+            static bool init = false;
+            if (!init) {
+                float argFieldWidth = 60.0f;
+                init = true;
+
+                args.Init();
+                Vec2 argPos = { filterOrigin.x, filterOrigin.y };
+                args.Append(CreateInputField(
+                    argPos, { argFieldWidth, (float32)cmSerif16.height },
+                    { 1.0f, 1.0f, 1.0f, 0.2f },
+                    { 1.0f, 1.0f, 1.0f, 0.4f },
+                    { 1.0f, 1.0f, 1.0f, 0.5f },
+                    { 1.0f, 1.0f, 1.0f, 0.9f }
+                ));
+                argPos.x += argFieldWidth + 10.0f;
+                args.Append(CreateInputField(
+                    argPos, { argFieldWidth, (float32)cmSerif16.height },
+                    { 1.0f, 1.0f, 1.0f, 0.2f },
+                    { 1.0f, 1.0f, 1.0f, 0.4f },
+                    { 1.0f, 1.0f, 1.0f, 0.5f },
+                    { 1.0f, 1.0f, 1.0f, 0.9f }
+                ));
+                argPos.x += argFieldWidth + 10.0f;
+                args.Append(CreateInputField(
+                    argPos, { argFieldWidth, (float32)cmSerif16.height },
+                    { 1.0f, 1.0f, 1.0f, 0.2f },
+                    { 1.0f, 1.0f, 1.0f, 0.4f },
+                    { 1.0f, 1.0f, 1.0f, 0.5f },
+                    { 1.0f, 1.0f, 1.0f, 0.9f }
+                ));
+            }
+
+            Vec3 translatePos = filterOrigin;
+            translatePos.y += 0.0f;
+            Vec2 translateSize = {
+                200.0f,
+                (float32)cmSerif16.height + 20.0f + (float32)cmSerif16.height
+            };
+            DrawRect(rectGL, translatePos, Vec2::zero, translateSize,
+                { 1.0f, 1.0f, 1.0f, 0.2f });
+            Vec3 translateNamePos = translatePos;
+            translateNamePos.y += translateSize.y;
+            DrawText(textGL, cmSerif16, "Translate", translateNamePos,
+                { 0.0f, 1.0f }, { 1.0f, 1.0f, 1.0f, 0.6f });
+
+            UpdateInputFields(args.data, args.size, mousePos, clickState_,
                 keyInputBuffer, keyInputBufferSize);
-
-            DrawClickableBoxes(boxes.data, boxes.size, rectGL);
-            DrawButtons(buttons.data, buttons.size,
-                rectGL, textGL, cmSerif);
-            DrawInputFields(fields.data, fields.size,
-                rectGL, textGL, cmSerif);
+            DrawInputFields(args.data, args.size, rectGL, textGL, cmSerif16);
         }
 
         // Clear all key events
@@ -578,6 +488,7 @@ int main(int argc, char* argv[])
 #include "load_bmp.cpp"
 #include "gui.cpp"
 #include "halfedge.cpp"
+#include "filters.cpp"
 
 #include "glew.c"
 //#undef internal
