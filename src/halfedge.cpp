@@ -27,14 +27,18 @@ Vec3 ParseVec3(char* str)
     return result;
 }
 
-HalfEdgeMesh HalfEdgeMeshFromObj(const char* filePath)
+HalfEdgeMesh HalfEdgeMeshFromObj(const char* fileName)
 {
+    const char* MODEL_DIR = "data/models/";
+
     HalfEdgeMesh mesh;
     mesh.vertices.Init();
     mesh.faces.Init();
     mesh.halfEdges.Init();
 
+    char filePath[PATH_MAX_LENGTH];
     char fullPath[PATH_MAX_LENGTH];
+    CatStrings(MODEL_DIR, fileName, filePath, PATH_MAX_LENGTH);
     CatStrings(GetAppPath(), filePath, fullPath, PATH_MAX_LENGTH);
     FILE* file = fopen(filePath, "rb");
     if (!file) {

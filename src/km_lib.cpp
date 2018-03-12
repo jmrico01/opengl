@@ -53,6 +53,20 @@ void DynamicArray<T>::Append(T element)
 }
 
 template <typename T>
+void DynamicArray<T>::Remove(uint32 idx)
+{
+    // debug assert
+    if (idx >= size) {
+        printf("ERROR: Removed element beyond DynamicArray size\n");
+    }
+
+    for (uint32 i = idx + 1; i < size; i++) {
+        data[i - 1] = data[i];
+    }
+    size--;
+}
+
+template <typename T>
 void DynamicArray<T>::Free()
 {
     free(data);

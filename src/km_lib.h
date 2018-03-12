@@ -10,6 +10,8 @@ struct DynamicArray
     void Init();
     DynamicArray<T> Copy() const;
     void Append(T element);
+    // Slow, linear time
+    void Remove(uint32 idx);
     void Free();
 
     // TODO make inline

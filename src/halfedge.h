@@ -39,7 +39,7 @@ struct HalfEdgeMeshGL
     int vertexCount;
 };
 
-HalfEdgeMesh HalfEdgeMeshFromObj(const char* filePath);
+HalfEdgeMesh HalfEdgeMeshFromObj(const char* fileName);
 HalfEdgeMesh CopyHalfEdgeMesh(const HalfEdgeMesh* mesh);
 void SplitFaceMakeEdge(HalfEdgeMesh* mesh, uint32 f, uint32 v1, uint32 v2);
 void TriangulateMesh(HalfEdgeMesh* mesh);

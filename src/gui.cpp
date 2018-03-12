@@ -1,5 +1,7 @@
 #include "gui.h"
 
+#include <map>
+
 #include "km_math.h"
 #include "ogl_base.h"
 #include "text.h"
@@ -39,15 +41,16 @@ Button CreateButton(Vec2 origin, Vec2 size,
     return button;
 }
 
-InputField CreateInputField(Vec2 origin, Vec2 size,
+InputField CreateInputField(Vec2 origin, Vec2 size, const char* text,
     Vec4 color, Vec4 hoverColor, Vec4 pressColor, Vec4 textColor)
 {
     InputField inputField = {};
     inputField.box = CreateClickableBox(origin, size,
         color, hoverColor, pressColor);
 
-    inputField.text[0] = '\0';
-    inputField.textLen = 0;
+    inputField.textLen = (uint32)strnlen(text, INPUT_BUFFER_SIZE - 1);
+    strncpy(inputField.text, text, inputField.textLen);
+    inputField.text[inputField.textLen] = '\0';
 
     inputField.textColor = textColor;
 
@@ -119,7 +122,13 @@ void DrawButtons(Button buttons[], uint32 n,
 void UpdateInputFields(InputField fields[], uint32 n,
     Vec2 mousePos, int clickState, KeyEvent* keyBuf, uint32 keyBufSize)
 {
-    static int focus = -1;
+    // TODO this is horribly hacky
+    static std::map<uint64, int> focus;
+    uint64 fieldsID = (uint64)fields;
+    if (focus.find(fieldsID) != focus.end()) {
+        focus.insert(std::pair<uint64, int>(fieldsID, -1));
+    }
+
     bool anyPressed = false;
     for (uint32 i = 0; i < n; i++) {
         UpdateClickableBoxes(&fields[i].box, 1, mousePos, clickState);
@@ -127,19 +136,19 @@ void UpdateInputFields(InputField fields[], uint32 n,
         if (fields[i].box.pressed) {
             // TODO picks the last one for now. sort based on Z?
             //printf("new input focus: %d\n", i);
-            focus = i;
+            focus[fieldsID] = i;
             anyPressed = true;
         }
     }
 
-    if (focus != -1 && (clickState & CLICKSTATE_LEFT_PRESS) != 0
+    if (focus[fieldsID] != -1 && (clickState & CLICKSTATE_LEFT_PRESS) != 0
     && !anyPressed) {
         //printf("lost focus\n");
-        focus = -1;
+        focus[fieldsID] = -1;
     }
 
     // TODO mysterious bug: can't type in more than 16 characters...
-    if (focus != -1 && keyBufSize != 0) {
+    if (focus[fieldsID] != -1 && keyBufSize != 0) {
         //printf("size: %d\n", (int)sizeof(fields[focus]));
         for (uint32 i = 0; i < keyBufSize; i++) {
             if (!keyBuf[i].pressed) {
@@ -148,19 +157,20 @@ void UpdateInputFields(InputField fields[], uint32 n,
 
             if (keyBuf[i].ascii == 8) {
                 //printf(">> backspaced\n");
-                if (fields[focus].textLen > 0) {
-                    fields[focus].textLen--;
+                if (fields[focus[fieldsID]].textLen > 0) {
+                    fields[focus[fieldsID]].textLen--;
                 }
             }
-            else if (fields[focus].textLen < INPUT_BUFFER_SIZE - 1) {
+            else if (fields[focus[fieldsID]].textLen < INPUT_BUFFER_SIZE - 1) {
                 //printf("added %c\n", keyBuf[i].ascii);
                 //printf("textLen before: %d\n", fields[focus].textLen);
-                fields[focus].text[fields[focus].textLen++] = keyBuf[i].ascii;
+                fields[focus[fieldsID]].text[fields[focus[fieldsID]].textLen++]
+                    = keyBuf[i].ascii;
             }
         }
-        fields[focus].text[fields[focus].textLen] = '\0';
+        fields[focus[fieldsID]].text[fields[focus[fieldsID]].textLen] = '\0';
         //printf("new focus (%d) length: %d\n", focus, fields[focus].textLen);
-        for (uint32 i = 0; i < fields[focus].textLen; i++) {
+        for (uint32 i = 0; i < fields[focus[fieldsID]].textLen; i++) {
             //printf("chardump: %c\n", fields[focus].text[i]);
         }
         //printf("new text: %s\n", fields[focus].text);

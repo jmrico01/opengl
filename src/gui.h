@@ -51,7 +51,7 @@ ClickableBox CreateClickableBox(Vec2 origin, Vec2 size,
 Button CreateButton(Vec2 origin, Vec2 size,
     const char* text, ButtonCallback callback,
     Vec4 color, Vec4 hoverColor, Vec4 pressColor, Vec4 textColor);
-InputField CreateInputField(Vec2 origin, Vec2 size,
+InputField CreateInputField(Vec2 origin, Vec2 size, const char* text,
     Vec4 color, Vec4 hoverColor, Vec4 pressColor, Vec4 textColor);
 
 void UpdateClickableBoxes(ClickableBox boxes[], uint32 n,

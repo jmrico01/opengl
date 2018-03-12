@@ -87,7 +87,7 @@ internal void KeyCallback(GLFWwindow* window,
     if (key == GLFW_KEY_BACKSPACE) {
         KeyEvent keyEvent;
         keyEvent.ascii = 8;
-        if (action == GLFW_PRESS) {
+        if (action == GLFW_PRESS || action == GLFW_REPEAT) {
             keyEvent.pressed = true;
         }
         else if (action == GLFW_RELEASE) {
@@ -273,6 +273,29 @@ int main(int argc, char* argv[])
         library, "data/fonts/computer-modern/serif-bold.ttf", 48);
     FontFace cmSerifBold128 = LoadFontFace(
         library, "data/fonts/computer-modern/serif-bold.ttf", 128);*/
+    
+    const char* MODEL_START = "cube.obj";
+    filters_.Init();
+    { // Create model loading filter
+        FilterEntry modelLoadFilter;
+        modelLoadFilter.updateFunc = FilterUpdateModelLoad;
+        modelLoadFilter.applyFunc = FilterModelLoad;
+
+        ModelLoadData* modelLoadData =
+            (ModelLoadData*)malloc(sizeof(ModelLoadData));
+        modelLoadData->inputField = CreateInputField(
+            Vec2::zero,
+            { 200.0f, (float32)cmSerif16.height },
+            MODEL_START,
+            { 1.0f, 1.0f, 1.0f, 0.2f },
+            { 1.0f, 1.0f, 1.0f, 0.4f },
+            { 1.0f, 1.0f, 1.0f, 0.5f },
+            { 1.0f, 1.0f, 1.0f, 0.9f }
+        );
+        modelLoadFilter.data = (void*)modelLoadData;
+
+        filters_.Append(modelLoadFilter);
+    }
 
     DynamicArray<ClickableBox> boxes;
     boxes.Init();
@@ -280,30 +303,16 @@ int main(int argc, char* argv[])
     fields.Init();
     // Nothing in these, for now
 
-    struct FilterInfo {
-        const char* name;
-        ButtonCallback callback;
-    } filterInfo[] = {
-        { "Translate",  FilterButtonTranslate },
-        { "Rotate",     FilterButtonRotate },
-        { "Scale",      FilterButtonScale },
-        { "",           FilterButtonNone },
-        { "Twist",      FilterButtonNone },
-        { "Inflate",    FilterButtonNone },
-        { "Wacky",      FilterButtonNone }
-    };
-    const int numFilters = sizeof(filterInfo) / sizeof(filterInfo[0]);
-
     DynamicArray<Button> filterButtons;
     filterButtons.Init();
-    for (int i = 0; i < numFilters; i++) {
+    for (int i = 0; i < numFilters_; i++) {
         Vec2 origin = { 10.0f, 10.0f + 1.1f * cmSerif.height * i };
         Vec2 size = {
-            (float32)GetTextWidth(cmSerif, filterInfo[i].name),
+            (float32)GetTextWidth(cmSerif, filterInfo_[i].name),
             (float32)cmSerif.height
         };
         filterButtons.Append(CreateButton(origin, size,
-            filterInfo[i].name, filterInfo[i].callback,
+            filterInfo_[i].name, filterInfo_[i].callback,
             { 1.0f, 1.0f, 0.0f, 0.2f },
             { 1.0f, 1.0f, 0.0f, 0.5f },
             { 1.0f, 1.0f, 0.0f, 0.6f },
@@ -313,15 +322,11 @@ int main(int argc, char* argv[])
 
     SharedState state;
 
-    state.mesh = HalfEdgeMeshFromObj("data/models/cheetah.obj");
+    state.mesh = HalfEdgeMeshFromObj(MODEL_START);
     if (state.mesh.vertices.size == 0) {
         printf("not loaded\n");
     }
     state.meshGL = LoadHalfEdgeMeshGL(state.mesh);
-    printf("meshGL: va %d, vb %d, pid %d\n",
-        state.meshGL.vertexArray,
-        state.meshGL.vertexBuffer,
-        state.meshGL.programID);
 
     glfwSetFramebufferSizeCallback(window, FramebufferSizeCallback);
     // Set up input handling.
@@ -341,7 +346,10 @@ int main(int argc, char* argv[])
     Vec2 mousePos = Vec2::zero, mousePosPrev = Vec2::zero;
 
     state.cameraPos = { 0.0f, 0.0f, DEFAULT_CAM_Z };
-    state.modelRot = Quat::one;
+    state.modelRot = QuatFromEulerAngles(
+        { -PI_F / 4.0f, PI_F / 4.0f, 0.615f });
+
+    int enterState = GLFW_RELEASE, enterStatePrev = GLFW_RELEASE;
 
     while (!glfwWindowShouldClose(window)) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -394,8 +402,8 @@ int main(int argc, char* argv[])
         // 3D rendering end
 
         UpdateClickableBoxes(boxes.data, boxes.size, mousePos, clickState_);
-        /*UpdateInputFields(fields.data, fields.size, mousePos, clickState_,
-            keyInputBuffer, keyInputBufferSize);*/
+        UpdateInputFields(fields.data, fields.size, mousePos, clickState_,
+            keyInputBuffer, keyInputBufferSize);
 
         for (uint32 i = 0; i < filterButtons.size; i++) {
             UpdateButtons(&filterButtons[i], 1, mousePos,
@@ -409,11 +417,35 @@ int main(int argc, char* argv[])
         DrawButtons(filterButtons.data, filterButtons.size,
             rectGL, textGL, cmSerif);
 
+        Vec3 filterOrigin = { 150.0f, 10.0f, 0.0f };
+        DrawText(textGL, cmSerif16, "Press Enter to reapply all filters",
+            filterOrigin, { 0.0f, 0.0f },
+            { 1.0f, 1.0f, 1.0f, 1.0f });
+        filterOrigin.y += (float32)cmSerif16.height;
+        for (uint32 i = 0; i < filters_.size; i++) {
+            Vec3 filterPos = filterOrigin;
+            filterPos.y += 100.0f * i;
+            filters_[i].updateFunc(&filters_[i], filterPos,
+                rectGL, textGL, cmSerif16,
+                mousePos, clickState_, keyInputBuffer, keyInputBufferSize);
+        }
+
+        enterStatePrev = enterState;
+        enterState = glfwGetKey(window, GLFW_KEY_ENTER);
+        if (enterState == GLFW_PRESS && enterStatePrev == GLFW_RELEASE) {
+            printf("=> Reapplying filter list...\n");
+            for (uint32 i = 0; i < filters_.size; i++) {
+                filters_[i].applyFunc(&filters_[i], &state);
+            }
+            printf("=> DONE!\n");
+        }
+
+        #if 0
         {
-            Vec3 filterOrigin = { 150.0f, 60.0f, 0.0f };
+            static InputField model;
+            static bool init = false;
 
             static DynamicArray<InputField> args;
-            static bool init = false;
             if (!init) {
                 float argFieldWidth = 60.0f;
                 init = true;
@@ -422,6 +454,7 @@ int main(int argc, char* argv[])
                 Vec2 argPos = { filterOrigin.x, filterOrigin.y };
                 args.Append(CreateInputField(
                     argPos, { argFieldWidth, (float32)cmSerif16.height },
+                    "0.0",
                     { 1.0f, 1.0f, 1.0f, 0.2f },
                     { 1.0f, 1.0f, 1.0f, 0.4f },
                     { 1.0f, 1.0f, 1.0f, 0.5f },
@@ -430,6 +463,7 @@ int main(int argc, char* argv[])
                 argPos.x += argFieldWidth + 10.0f;
                 args.Append(CreateInputField(
                     argPos, { argFieldWidth, (float32)cmSerif16.height },
+                    "0.0",
                     { 1.0f, 1.0f, 1.0f, 0.2f },
                     { 1.0f, 1.0f, 1.0f, 0.4f },
                     { 1.0f, 1.0f, 1.0f, 0.5f },
@@ -438,6 +472,7 @@ int main(int argc, char* argv[])
                 argPos.x += argFieldWidth + 10.0f;
                 args.Append(CreateInputField(
                     argPos, { argFieldWidth, (float32)cmSerif16.height },
+                    "0.0",
                     { 1.0f, 1.0f, 1.0f, 0.2f },
                     { 1.0f, 1.0f, 1.0f, 0.4f },
                     { 1.0f, 1.0f, 1.0f, 0.5f },
@@ -462,6 +497,7 @@ int main(int argc, char* argv[])
                 keyInputBuffer, keyInputBufferSize);
             DrawInputFields(args.data, args.size, rectGL, textGL, cmSerif16);
         }
+        #endif
 
         // Clear all key events
         keyInputBufferSize = 0;
