@@ -32,7 +32,7 @@ struct SharedState
     HalfEdgeMesh mesh;
     HalfEdgeMeshGL meshGL;
 
-    //DynamicArray
+    DynamicArray<uint32> selectedFaces;
 };
 
 char* GetAppPath();

@@ -51,7 +51,7 @@ void FilterUpdateModelLoad(FilterEntry* entry, Vec3 pos,
     DrawInputFields(&data->inputField, 1, rectGL, textGL, font);
 }
 
-internal void FilterUpdateTranslate(FilterEntry* entry, Vec3 pos,
+internal void FilterUpdateSingleFloat(FilterEntry* entry, Vec3 pos,
     RectGL rectGL, TextGL textGL, const FontFace& font,
     Vec2 mousePos, int clickState, KeyEvent* keyBuf, uint32 keyBufSize)
 {
@@ -62,7 +62,30 @@ internal void FilterUpdateTranslate(FilterEntry* entry, Vec3 pos,
     DrawFilterBase(entry, pos, size, rectGL, textGL, font,
         mousePos, clickState);
 
-    TranslateData* data = (TranslateData*)entry->data;
+    SingleFloatData* data = (SingleFloatData*)entry->data;
+    Vec2 pos2D = { pos.x, pos.y };
+    Vec2 inputSize = { size.x, (float32)font.height };
+    data->inputValue.box.origin = pos2D;
+    data->inputValue.box.size = inputSize;
+    UpdateInputFields(&data->inputValue, 1, mousePos, clickState,
+        keyBuf, keyBufSize);
+    DrawInputFields(&data->inputValue, 1, rectGL, textGL, font);
+
+    data->value = (float32)strtod(data->inputValue.text, nullptr);
+}
+
+internal void FilterUpdateVec3(FilterEntry* entry, Vec3 pos,
+    RectGL rectGL, TextGL textGL, const FontFace& font,
+    Vec2 mousePos, int clickState, KeyEvent* keyBuf, uint32 keyBufSize)
+{
+    Vec2 size = {
+        FILTER_BOX_WIDTH,
+        2.0f * (float32)font.height + 10.0f
+    };
+    DrawFilterBase(entry, pos, size, rectGL, textGL, font,
+        mousePos, clickState);
+
+    Vec3Data* data = (Vec3Data*)entry->data;
     Vec2 pos2D = { pos.x, pos.y };
     for (int i = 0; i < 3; i++) {
         Vec2 inputPos = pos2D;
@@ -76,44 +99,18 @@ internal void FilterUpdateTranslate(FilterEntry* entry, Vec3 pos,
     DrawInputFields(data->inputCoords, 3, rectGL, textGL, font);
 
     for (int i = 0; i < 3; i++) {
-        data->offset.e[i] = (float32)strtod(data->inputCoords[i].text, nullptr);
+        data->vector.e[i] =
+            (float32)strtod(data->inputCoords[i].text, nullptr);
     }
 }
 
-internal void FilterUpdateRotate(FilterEntry* entry, Vec3 pos,
-    RectGL rectGL, TextGL textGL, const FontFace& font,
-    Vec2 mousePos, int clickState, KeyEvent* keyBuf, uint32 keyBufSize)
-{
-    Vec2 size = {
-        FILTER_BOX_WIDTH,
-        2.0f * (float32)font.height + 10.0f
-    };
-    DrawFilterBase(entry, pos, size, rectGL, textGL, font,
-        mousePos, clickState);
-
-    RotateData* data = (RotateData*)entry->data;
-    Vec2 pos2D = { pos.x, pos.y };
-    for (int i = 0; i < 3; i++) {
-        Vec2 inputPos = pos2D;
-        inputPos.x += i * 80.0f;
-        Vec2 inputSize = { size.x / 3.0f, (float32)font.height };
-        data->inputCoords[i].box.origin = inputPos;
-        data->inputCoords[i].box.size = inputSize;
-    }
-    UpdateInputFields(data->inputCoords, 3, mousePos, clickState,
-        keyBuf, keyBufSize);
-    DrawInputFields(data->inputCoords, 3, rectGL, textGL, font);
-
-    for (int i = 0; i < 3; i++) {
-        data->rot.e[i] = (float32)strtod(data->inputCoords[i].text, nullptr);
-    }
-}
-
-internal void CloseButtonPress(Button* button, void* data)
+internal void RemoveButtonPress(Button* button, void* data)
 {
     FilterEntry* entry = (FilterEntry*)data;
+    printf("Appending, size %d, capacity %d\n",
+        filtersToDelete_.size, filtersToDelete_.capacity);
     filtersToDelete_.Append(entry->idx);
-    printf("Queued for deletion - filter #%d: %s\n", entry->idx, entry->name);
+    printf("Queued for removal - filter #%d: %s\n", entry->idx, entry->name);
 }
 
 internal FilterEntry FilterButtonBase(Button* button)
@@ -124,7 +121,7 @@ internal FilterEntry FilterButtonBase(Button* button)
 
     entry.removeButton = CreateButton(
         Vec2::zero, Vec2::zero,
-        "X", CloseButtonPress,
+        "X", RemoveButtonPress,
         { 1.0f, 0.2f, 0.2f, 0.2f },
         { 1.0f, 0.2f, 0.2f, 0.4f },
         { 1.0f, 0.2f, 0.2f, 0.5f },
@@ -139,19 +136,43 @@ void FilterButtonNone(Button* button, void* data)
     printf("Filter not implemented (%s)\n", button->text);
 }
 
-void FilterButtonTranslate(Button* button, void* data)
+internal void FilterCreateSingleFloat(Button* button, void* data,
+    const char* initVal, FilterApplyFunc filterFunc)
 {
     FilterEntry entry = FilterButtonBase(button);
-    entry.updateFunc = FilterUpdateTranslate;
-    entry.applyFunc = FilterTranslate;
+    entry.updateFunc = FilterUpdateSingleFloat;
+    entry.applyFunc = filterFunc;
 
-    TranslateData* translateData =
-        (TranslateData*)malloc(sizeof(TranslateData));
+    SingleFloatData* d =
+        (SingleFloatData*)malloc(sizeof(SingleFloatData));
+    d->inputValue = CreateInputField(
+        Vec2::zero,
+        Vec2::zero,
+        "1",
+        { 1.0f, 1.0f, 1.0f, 0.2f },
+        { 1.0f, 1.0f, 1.0f, 0.4f },
+        { 1.0f, 1.0f, 1.0f, 0.5f },
+        { 1.0f, 1.0f, 1.0f, 0.9f }
+    );
+
+    entry.data = (void*)d;
+
+    filters_.Append(entry);
+}
+
+internal void FilterCreateVec3(Button* button, void* data,
+    const char* initVal, FilterApplyFunc filterFunc)
+{
+    FilterEntry entry = FilterButtonBase(button);
+    entry.updateFunc = FilterUpdateVec3;
+    entry.applyFunc = filterFunc;
+
+    Vec3Data* d = (Vec3Data*)malloc(sizeof(Vec3Data));
     for (int i = 0; i < 3; i++) {
-        translateData->inputCoords[i] = CreateInputField(
+        d->inputCoords[i] = CreateInputField(
             Vec2::zero,
             Vec2::zero,
-            "0",
+            initVal,
             { 1.0f, 1.0f, 1.0f, 0.2f },
             { 1.0f, 1.0f, 1.0f, 0.4f },
             { 1.0f, 1.0f, 1.0f, 0.5f },
@@ -159,39 +180,34 @@ void FilterButtonTranslate(Button* button, void* data)
         );
     }
 
-    entry.data = (void*)translateData;
+    entry.data = (void*)d;
 
     filters_.Append(entry);
+}
+
+void FilterButtonTranslate(Button* button, void* data)
+{
+    FilterCreateVec3(button, data, "0", FilterTranslate);
 }
 
 void FilterButtonRotate(Button* button, void* data)
 {
-    FilterEntry entry = FilterButtonBase(button);
-    entry.updateFunc = FilterUpdateRotate;
-    entry.applyFunc = FilterRotate;
-
-    RotateData* rotateData =
-        (RotateData*)malloc(sizeof(RotateData));
-    for (int i = 0; i < 3; i++) {
-        rotateData->inputCoords[i] = CreateInputField(
-            Vec2::zero,
-            Vec2::zero,
-            "0",
-            { 1.0f, 1.0f, 1.0f, 0.2f },
-            { 1.0f, 1.0f, 1.0f, 0.4f },
-            { 1.0f, 1.0f, 1.0f, 0.5f },
-            { 1.0f, 1.0f, 1.0f, 0.9f }
-        );
-    }
-
-    entry.data = (void*)rotateData;
-
-    filters_.Append(entry);
+    FilterCreateVec3(button, data, "0", FilterRotate);
 }
 
 void FilterButtonScale(Button* button, void* data)
 {
-    printf("add scaling\n");
+    FilterCreateSingleFloat(button, data, "1", FilterScale);
+}
+
+void FilterButtonTwist(Button* button, void* data)
+{
+    FilterCreateSingleFloat(button, data, "0.2", FilterTwist);
+}
+
+void FilterButtonNoise(Button* button, void* data)
+{
+    FilterCreateSingleFloat(button, data, "0.5", FilterNoise);
 }
 
 // ========== Filter implementations ==========
@@ -211,8 +227,9 @@ void FilterModelLoad(FilterEntry* entry, SharedState* state)
 
 void FilterTranslate(FilterEntry* entry, SharedState* state)
 {
-    TranslateData* data = (TranslateData*)entry->data;
-    Vec3 offset = data->offset;
+    Vec3Data* data = (Vec3Data*)entry->data;
+    Vec3 offset = data->vector;
+
     for (uint32 i = 0; i < state->mesh.vertices.size; i++) {
         state->mesh.vertices[i].pos += offset;
     }
@@ -221,8 +238,8 @@ void FilterTranslate(FilterEntry* entry, SharedState* state)
 }
 void FilterRotate(FilterEntry* entry, SharedState* state)
 {
-    RotateData* data = (RotateData*)entry->data;
-    Vec3 rot = data->rot;
+    Vec3Data* data = (Vec3Data*)entry->data;
+    Vec3 rot = data->vector;
     Quat rotQuat =
         QuatFromAngleUnitAxis(rot.z, Vec3::unitZ)
         * QuatFromAngleUnitAxis(rot.y, Vec3::unitY)
@@ -236,5 +253,47 @@ void FilterRotate(FilterEntry* entry, SharedState* state)
 }
 void FilterScale(FilterEntry* entry, SharedState* state)
 {
-    ScaleData* data = (ScaleData*)entry->data;
+    SingleFloatData* data = (SingleFloatData*)entry->data;
+    float scale = data->value;
+
+    for (uint32 i = 0; i < state->mesh.vertices.size; i++) {
+        state->mesh.vertices[i].pos *= scale;
+    }
+
+    printf("Scaled by %f\n", scale);
+}
+
+void FilterTwist(FilterEntry* entry, SharedState* state)
+{
+    SingleFloatData* data = (SingleFloatData*)entry->data;
+    float value = data->value;
+
+    for (uint32 i = 0; i < state->mesh.vertices.size; i++) {
+        float y = state->mesh.vertices[i].pos.y;
+        Quat rot = QuatFromAngleUnitAxis(y * value * PI_F, Vec3::unitY);
+        state->mesh.vertices[i].pos = rot * state->mesh.vertices[i].pos;
+    }
+
+    printf("Twisted with value %f\n", value);
+}
+
+void FilterInflate(FilterEntry* entry, SharedState* state)
+{
+    // TODO need vertex normals
+}
+
+void FilterWacky(FilterEntry* entry, SharedState* state)
+{
+    // TODO need vertex normals
+}
+
+void FilterNoise(FilterEntry* entry, SharedState* state)
+{
+    SingleFloatData* data = (SingleFloatData*)entry->data;
+    float value = data->value;
+
+    for (uint32 i = 0; i < state->mesh.vertices.size; i++) {
+        value *= i;
+        // TODO need normal
+    }
 }

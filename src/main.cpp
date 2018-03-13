@@ -276,6 +276,7 @@ int main(int argc, char* argv[])
     
     const char* MODEL_START = "cube.obj";
     filters_.Init();
+    filtersToDelete_.Init();
     { // Manually add model loading filter
         FilterEntry modelLoadFilter;
         modelLoadFilter.idx = -1;
@@ -348,8 +349,9 @@ int main(int argc, char* argv[])
     Vec2 mousePos = Vec2::zero, mousePosPrev = Vec2::zero;
 
     state.cameraPos = { 0.0f, 0.0f, DEFAULT_CAM_Z };
-    state.modelRot = QuatFromEulerAngles(
-        { -PI_F / 4.0f, PI_F / 4.0f, 0.615f });
+    state.modelRot =
+        QuatFromAngleUnitAxis(PI_F / 6.0f, Vec3::unitX)
+        * QuatFromAngleUnitAxis(-PI_F / 4.0f, Vec3::unitY);
 
     int enterState = GLFW_RELEASE, enterStatePrev = GLFW_RELEASE;
 
@@ -459,7 +461,7 @@ int main(int argc, char* argv[])
                 filters_[i].applyFunc(&filters_[i], &state);
             }
             printf("-> Reloading mesh into OpenGL...\n");
-            FreeHalfEdgeMeshGL(state.meshGL);
+            FreeHalfEdgeMeshGL(&state.meshGL);
             state.meshGL = LoadHalfEdgeMeshGL(state.mesh);
             printf("=> DONE!\n");
         }
