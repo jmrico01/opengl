@@ -7,7 +7,9 @@ struct DynamicArray
     uint32 capacity;
     T* data;
 
-    void Init();
+    DynamicArray();
+    DynamicArray(uint32 capacity);
+
     DynamicArray<T> Copy() const;
     void Append(T element);
     // Slow, linear time

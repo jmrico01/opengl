@@ -2,15 +2,19 @@
 
 #include <stdio.h>
 
-#define DYNAMIC_ARRAY_START_SIZE 10
-
-#define HASH_MAP_START_SIZE 10
+#define DYNAMIC_ARRAY_START_CAPACITY 10
 
 template <typename T>
-void DynamicArray<T>::Init()
+DynamicArray<T>::DynamicArray()
+    : DynamicArray(DYNAMIC_ARRAY_START_CAPACITY)
+{
+}
+
+template <typename T>
+DynamicArray<T>::DynamicArray(uint32 capacity)
 {
     size = 0;
-    capacity = DYNAMIC_ARRAY_START_SIZE;
+    this->capacity = capacity;
     data = (T*)malloc(sizeof(T) * capacity);
     if (!data) {
         // TODO error!

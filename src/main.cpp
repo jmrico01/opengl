@@ -22,12 +22,14 @@
 // TODO (on linux at least) the window's top bar is part
 // of the viewport, so the render scene is cropped.
 
-// TODO get rid of this... getting tired of writing that
+// TODO get rid of these globals... getting tired of writing that
 global_var char pathToApp_[PATH_MAX_LENGTH];
 global_var int width_ = 1024;
 global_var int height_ = 768;
 global_var int clickState_ = CLICKSTATE_NONE;
 global_var float scrollCumY_ = 0.0f;
+
+global_var bool useSmoothNormals_ = false;
 
 global_var KeyEvent keyInputBuffer[KEY_INPUT_BUFFER_MAX];
 global_var uint32 keyInputBufferSize = 0;
@@ -187,10 +189,15 @@ ReadFileResult ReadFile(const char* path)
     return result;
 }
 
-void FuncResetView(SharedState* state, void* data)
+void UseFaceNormals(Button* button, void* data)
 {
-    state->cameraPos = { 0.0f, 0.0f, DEFAULT_CAM_Z };
-    state->modelRot = Quat::one;
+    useSmoothNormals_ = false;
+    printf("Now rendering with face normals\n");
+}
+void UseVertexNormals(Button* button, void* data)
+{
+    useSmoothNormals_ = true;
+    printf("Now rendering with vertex normals\n");
 }
 
 int main(int argc, char* argv[])
@@ -275,8 +282,6 @@ int main(int argc, char* argv[])
         library, "data/fonts/computer-modern/serif-bold.ttf", 128);*/
     
     const char* MODEL_START = "cube.obj";
-    filters_.Init();
-    filtersToDelete_.Init();
     { // Manually add model loading filter
         FilterEntry modelLoadFilter;
         modelLoadFilter.idx = -1;
@@ -300,14 +305,37 @@ int main(int argc, char* argv[])
         filters_.Append(modelLoadFilter);
     }
 
-    DynamicArray<ClickableBox> boxes;
-    boxes.Init();
-    DynamicArray<InputField> fields;
-    fields.Init();
-    // Nothing in these, for now
+    Button normalButtons[2];
+    {
+        const char* faceText = "Use Face Normals";
+        normalButtons[0] = CreateButton(
+            { 500.0f, 10.0f },
+            {
+                (float32)GetTextWidth(cmSerif16, faceText),
+                (float32)cmSerif16.height
+            },
+            faceText, UseFaceNormals,
+            { 1.0f, 1.0f, 0.0f, 0.2f },
+            { 1.0f, 1.0f, 0.0f, 0.5f },
+            { 1.0f, 1.0f, 0.0f, 0.6f },
+            { 0.8f, 0.8f, 0.8f, 1.0f }
+        );
+        const char* vertexText = "Use Vertex Normals";
+        normalButtons[1] = CreateButton(
+            { 500.0f, 10.0f + cmSerif16.height + 10.0f },
+            {
+                (float32)GetTextWidth(cmSerif16, vertexText),
+                (float32)cmSerif16.height
+            },
+            vertexText, UseVertexNormals,
+            { 1.0f, 1.0f, 0.0f, 0.2f },
+            { 1.0f, 1.0f, 0.0f, 0.5f },
+            { 1.0f, 1.0f, 0.0f, 0.6f },
+            { 0.8f, 0.8f, 0.8f, 1.0f }
+        );
+    }
 
     DynamicArray<Button> filterButtons;
-    filterButtons.Init();
     for (int i = 0; i < numFilters_; i++) {
         Vec2 origin = { 10.0f, 10.0f + 1.1f * cmSerif.height * i };
         Vec2 size = {
@@ -329,7 +357,7 @@ int main(int argc, char* argv[])
     if (state.mesh.vertices.size == 0) {
         printf("not loaded\n");
     }
-    state.meshGL = LoadHalfEdgeMeshGL(state.mesh);
+    state.meshGL = LoadHalfEdgeMeshGL(state.mesh, useSmoothNormals_);
 
     glfwSetFramebufferSizeCallback(window, FramebufferSizeCallback);
     // Set up input handling.
@@ -354,6 +382,7 @@ int main(int argc, char* argv[])
         * QuatFromAngleUnitAxis(-PI_F / 4.0f, Vec3::unitY);
 
     int enterState = GLFW_RELEASE, enterStatePrev = GLFW_RELEASE;
+    printf("\n");
 
     while (!glfwWindowShouldClose(window)) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -405,21 +434,23 @@ int main(int argc, char* argv[])
         glDisable(GL_DEPTH_TEST);
         // 3D rendering end
 
-        UpdateClickableBoxes(boxes.data, boxes.size, mousePos, clickState_);
-        UpdateInputFields(fields.data, fields.size, mousePos, clickState_,
-            keyInputBuffer, keyInputBufferSize);
+        bool applyFilters = false;
 
-        for (uint32 i = 0; i < filterButtons.size; i++) {
-            UpdateButtons(&filterButtons[i], 1, mousePos,
-                clickState_, &filterButtons[i].text);
-        }
-
-        DrawClickableBoxes(boxes.data, boxes.size, rectGL);
-        DrawInputFields(fields.data, fields.size,
-            rectGL, textGL, cmSerif);
-
+        uint32 nfPrev = filters_.size;
+        UpdateButtons(filterButtons.data, filterButtons.size,
+            mousePos, clickState_, nullptr);
         DrawButtons(filterButtons.data, filterButtons.size,
             rectGL, textGL, cmSerif);
+        if (nfPrev != filters_.size) {
+            applyFilters = true;
+        }
+
+        bool smoothNormalsPrev = useSmoothNormals_;
+        UpdateButtons(normalButtons, 2, mousePos, clickState_, nullptr);
+        DrawButtons(normalButtons, 2, rectGL, textGL, cmSerif16);
+        if (smoothNormalsPrev != useSmoothNormals_) {
+            applyFilters = true;
+        }
 
         Vec3 filterOrigin = { 150.0f, 10.0f, 0.0f };
         DrawText(textGL, cmSerif16, "Press Enter to reapply all filters",
@@ -446,84 +477,29 @@ int main(int argc, char* argv[])
                     filters_[j].idx -= 1;
                 }
                 // Free memory
-                free(entry.data);
+                if (entry.data != nullptr) {
+                    free(entry.data);
+                }
                 filters_.Remove(entry.idx);
             }
 
             filtersToDelete_.Clear();
+            applyFilters = true;
         }
 
         enterStatePrev = enterState;
         enterState = glfwGetKey(window, GLFW_KEY_ENTER);
-        if (enterState == GLFW_PRESS && enterStatePrev == GLFW_RELEASE) {
+        if (applyFilters
+        || (enterState == GLFW_PRESS && enterStatePrev == GLFW_RELEASE)) {
             printf("=> Reapplying filter list...\n");
             for (uint32 i = 0; i < filters_.size; i++) {
                 filters_[i].applyFunc(&filters_[i], &state);
             }
             printf("-> Reloading mesh into OpenGL...\n");
             FreeHalfEdgeMeshGL(&state.meshGL);
-            state.meshGL = LoadHalfEdgeMeshGL(state.mesh);
-            printf("=> DONE!\n");
+            state.meshGL = LoadHalfEdgeMeshGL(state.mesh, useSmoothNormals_);
+            printf("=> Done.\n\n");
         }
-
-        #if 0
-        {
-            static InputField model;
-            static bool init = false;
-
-            static DynamicArray<InputField> args;
-            if (!init) {
-                float argFieldWidth = 60.0f;
-                init = true;
-
-                args.Init();
-                Vec2 argPos = { filterOrigin.x, filterOrigin.y };
-                args.Append(CreateInputField(
-                    argPos, { argFieldWidth, (float32)cmSerif16.height },
-                    "0.0",
-                    { 1.0f, 1.0f, 1.0f, 0.2f },
-                    { 1.0f, 1.0f, 1.0f, 0.4f },
-                    { 1.0f, 1.0f, 1.0f, 0.5f },
-                    { 1.0f, 1.0f, 1.0f, 0.9f }
-                ));
-                argPos.x += argFieldWidth + 10.0f;
-                args.Append(CreateInputField(
-                    argPos, { argFieldWidth, (float32)cmSerif16.height },
-                    "0.0",
-                    { 1.0f, 1.0f, 1.0f, 0.2f },
-                    { 1.0f, 1.0f, 1.0f, 0.4f },
-                    { 1.0f, 1.0f, 1.0f, 0.5f },
-                    { 1.0f, 1.0f, 1.0f, 0.9f }
-                ));
-                argPos.x += argFieldWidth + 10.0f;
-                args.Append(CreateInputField(
-                    argPos, { argFieldWidth, (float32)cmSerif16.height },
-                    "0.0",
-                    { 1.0f, 1.0f, 1.0f, 0.2f },
-                    { 1.0f, 1.0f, 1.0f, 0.4f },
-                    { 1.0f, 1.0f, 1.0f, 0.5f },
-                    { 1.0f, 1.0f, 1.0f, 0.9f }
-                ));
-            }
-
-            Vec3 translatePos = filterOrigin;
-            translatePos.y += 0.0f;
-            Vec2 translateSize = {
-                200.0f,
-                (float32)cmSerif16.height + 20.0f + (float32)cmSerif16.height
-            };
-            DrawRect(rectGL, translatePos, Vec2::zero, translateSize,
-                { 1.0f, 1.0f, 1.0f, 0.2f });
-            Vec3 translateNamePos = translatePos;
-            translateNamePos.y += translateSize.y;
-            DrawText(textGL, cmSerif16, "Translate", translateNamePos,
-                { 0.0f, 1.0f }, { 1.0f, 1.0f, 1.0f, 0.6f });
-
-            UpdateInputFields(args.data, args.size, mousePos, clickState_,
-                keyInputBuffer, keyInputBufferSize);
-            DrawInputFields(args.data, args.size, rectGL, textGL, cmSerif16);
-        }
-        #endif
 
         // Clear all key events
         keyInputBufferSize = 0;

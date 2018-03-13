@@ -119,6 +119,65 @@ def WinCompileDebug():
         "popd"
     ]))
 
+def WinCompileRelease():
+    macros = "/D_CRT_SECURE_NO_WARNINGS"
+    compilerFlags = " ".join([
+        "/MT",     # CRT static link (release)
+        "/nologo",  # disables the "Microsoft C/C++ Optimizing Compiler" message
+        "/Gm-",     # disable incremental build things
+        "/GR-",     # disable type information
+        "/EHa-",    # disable exception handling
+        "/EHsc",    # handle stdlib errors
+        "/Ox",      # full optimization
+    ])
+    compilerWarningFlags = " ".join([
+        "/WX",      # treat warnings as errors
+        "/W4",      # level 4 warnings
+
+        # disable the following warnings:
+        "/wd4100",  # unused function arguments
+        "/wd4189",  # unused initialized local variable
+        "/wd4201",  # nonstandard extension used: nameless struct/union
+        "/wd4505",  # unreferenced local function has been removed
+    ])
+    includePaths = " ".join([
+        "/I" + paths["include-glew"],
+        "/I" + paths["include-glfw"],
+        "/I" + paths["include-freetype"],
+        "/I" + paths["include-lodepng"]
+    ])
+
+    linkerFlags = " ".join([
+        "/incremental:no",  # disable incremental linking
+        "/opt:ref"          # get rid of extraneous linkages
+    ])
+    libPaths = " ".join([
+        "/LIBPATH:" + paths["lib-glfw-win-r"],
+        "/LIBPATH:" + paths["lib-ft-win-r"]
+    ])
+    libs = " ".join([
+        "user32.lib",
+        "shell32.lib",
+        "gdi32.lib",
+        "opengl32.lib",
+        "glfw3.lib",
+        "freetype281MT.lib"
+    ])
+
+    compileCommand = " ".join([
+        "cl",
+        macros, compilerFlags, compilerWarningFlags, includePaths,
+        "/Feopengl.exe", paths["main-cpp"],
+        "/link", linkerFlags, libPaths, libs])
+    
+    loadCompiler = "call \"C:\\Program Files (x86)\\Microsoft Visual Studio 14.0\\VC\\vcvarsall.bat\" x64"
+    os.system(" & ".join([
+        "pushd " + paths["build"],
+        loadCompiler,
+        compileCommand,
+        "popd"
+    ]))
+
 def LinuxCompileDebug():
     compilerFlags = " ".join([
         "-std=c++11",       # use C++11 standard
@@ -299,7 +358,16 @@ def IfChanged():
         print "No changes. Nothing to compile."
 
 def Release():
-    print "Release: UNIMPLEMENTED"
+    CopyDir(paths["data"], paths["build-data"])
+    CopyDir(paths["src-shaders"], paths["build-shaders"])
+
+    platformName = platform.system()
+    if platformName == "Windows":
+        WinCompileRelease()
+    elif platformName == "Linux":
+        print "Release: UNIMPLEMENTED"
+    else:
+        print "Release: UNIMPLEMENTED"
 
 def External():
     if not os.path.exists(paths["external-build"]):

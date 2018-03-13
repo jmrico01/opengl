@@ -47,12 +47,12 @@ struct HalfEdgeMeshGL
 };
 
 HalfEdgeMesh HalfEdgeMeshFromObj(const char* fileName);
-HalfEdgeMesh CopyHalfEdgeMesh(const HalfEdgeMesh* mesh);
+HalfEdgeMesh CopyHalfEdgeMesh(const HalfEdgeMesh& mesh);
 void FreeHalfEdgeMesh(HalfEdgeMesh* mesh);
 
 void PrintHalfEdgeMesh(const HalfEdgeMesh& mesh);
 
-HalfEdgeMeshGL LoadHalfEdgeMeshGL(const HalfEdgeMesh& mesh);
+HalfEdgeMeshGL LoadHalfEdgeMeshGL(const HalfEdgeMesh& mesh, bool smoothNormals);
 void FreeHalfEdgeMeshGL(HalfEdgeMeshGL* meshGL);
 
 void DrawHalfEdgeMeshGL(const HalfEdgeMeshGL& meshGL, Mat4 proj, Mat4 view);
@@ -62,23 +62,25 @@ void SplitFaceMakeEdge(HalfEdgeMesh* mesh, uint32 f, uint32 v1, uint32 v2);
 void TriangulateMesh(HalfEdgeMesh* mesh);
 void ComputeFaceNormals(HalfEdgeMesh* mesh);
 void ComputeFaceAreas(HalfEdgeMesh* mesh);
+void ComputeVertexNormals(HalfEdgeMesh* mesh);
+void ComputeVertexAvgEdgeLengths(HalfEdgeMesh* mesh);
 
 // Mesh traversal functions
 void VerticesOnFace(const HalfEdgeMesh& mesh, uint32 f,
-    DynamicArray<Vertex>& out);
+    DynamicArray<uint32>& out);
 void EdgesOnFace(const HalfEdgeMesh& mesh, uint32 f,
-    DynamicArray<HalfEdge>& out);
+    DynamicArray<uint32>& out);
 void FacesOnFace(const HalfEdgeMesh& mesh, uint32 f,
-    DynamicArray<Face>& out);
+    DynamicArray<uint32>& out);
 
 void VerticesOnEdge(const HalfEdgeMesh& mesh, uint32 e,
-    DynamicArray<Vertex>& out);
+    DynamicArray<uint32>& out);
 void FacesOnEdge(const HalfEdgeMesh& mesh, uint32 e,
-    DynamicArray<Face>& out);
+    DynamicArray<uint32>& out);
 
 void VerticesOnVertex(const HalfEdgeMesh& mesh, uint32 v,
-    DynamicArray<Vertex>& out);
+    DynamicArray<uint32>& out);
 void EdgesOnVertex(const HalfEdgeMesh& mesh, uint32 v,
-    DynamicArray<Vertex>& out);
+    DynamicArray<uint32>& out);
 void FacesOnVertex(const HalfEdgeMesh& mesh, uint32 v,
-    DynamicArray<Vertex>& out);
+    DynamicArray<uint32>& out);

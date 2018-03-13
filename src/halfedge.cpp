@@ -32,9 +32,6 @@ HalfEdgeMesh HalfEdgeMeshFromObj(const char* fileName)
     const char* MODEL_DIR = "data/models/";
 
     HalfEdgeMesh mesh;
-    mesh.vertices.Init();
-    mesh.faces.Init();
-    mesh.halfEdges.Init();
 
     char filePath[PATH_MAX_LENGTH];
     char fullPath[PATH_MAX_LENGTH];
@@ -48,7 +45,6 @@ HalfEdgeMesh HalfEdgeMeshFromObj(const char* fileName)
 
     char line[OBJ_LINE_MAX];
     DynamicArray<int> faceInds;
-    faceInds.Init();
 
     while (fgets(line, OBJ_LINE_MAX, file)) {
         if (line[0] == '#') {
@@ -142,18 +138,19 @@ HalfEdgeMesh HalfEdgeMeshFromObj(const char* fileName)
 
     faceInds.Free();
     ComputeFaceNormals(&mesh);
+    ComputeVertexNormals(&mesh);
     //PrintHalfEdgeMesh(mesh);
 
     // TODO free mesh after this
     return mesh;
 }
 
-HalfEdgeMesh CopyHalfEdgeMesh(const HalfEdgeMesh* mesh)
+HalfEdgeMesh CopyHalfEdgeMesh(const HalfEdgeMesh& mesh)
 {
     HalfEdgeMesh newMesh;
-    newMesh.vertices = mesh->vertices.Copy();
-    newMesh.faces = mesh->faces.Copy();
-    newMesh.halfEdges = mesh->halfEdges.Copy();
+    newMesh.vertices = mesh.vertices.Copy();
+    newMesh.faces = mesh.faces.Copy();
+    newMesh.halfEdges = mesh.halfEdges.Copy();
 
     return newMesh;
 }
@@ -192,17 +189,15 @@ void PrintHalfEdgeMesh(const HalfEdgeMesh& mesh)
     }
 }
 
-HalfEdgeMeshGL LoadHalfEdgeMeshGL(const HalfEdgeMesh& mesh)
+HalfEdgeMeshGL LoadHalfEdgeMeshGL(const HalfEdgeMesh& mesh, bool smoothNormals)
 {
-    HalfEdgeMesh meshTri = CopyHalfEdgeMesh(&mesh);
+    HalfEdgeMesh meshTri = CopyHalfEdgeMesh(mesh);
     TriangulateMesh(&meshTri);
     HalfEdgeMeshGL meshGL = {};
 
     // TODO use indexing for this
     DynamicArray<Vec3> vertices;
-    vertices.Init();
     DynamicArray<Vec3> normals;
-    normals.Init();
 
     for (uint32 f = 0; f < meshTri.faces.size; f++) {
         Vec3 normal = meshTri.faces[f].normal;
@@ -211,6 +206,9 @@ HalfEdgeMeshGL LoadHalfEdgeMeshGL(const HalfEdgeMesh& mesh)
         do {
             Vertex v = meshTri.vertices[meshTri.halfEdges[e].vertex];
             vertices.Append(v.pos);
+            if (smoothNormals) {
+                normal = v.normal;
+            }
             normals.Append(normal);
             e = meshTri.halfEdges[e].next;
         } while (e != edge);
@@ -363,6 +361,7 @@ void TriangulateMesh(HalfEdgeMesh* mesh)
     }
 
     ComputeFaceNormals(mesh);
+    ComputeVertexNormals(mesh);
     //printf("==> TRIANGULATION FINISHED\n");
     //PrintHalfEdgeMesh((const HalfEdgeMesh&)*mesh);
 }
@@ -431,57 +430,119 @@ void ComputeFaceAreas(HalfEdgeMesh* mesh)
     }
 }
 
+void ComputeVertexNormals(HalfEdgeMesh* mesh)
+{
+    DynamicArray<uint32> faces;
+    for (uint32 v = 0; v < mesh->vertices.size; v++) {
+        Vec3 sumNormals = Vec3::zero;
+        FacesOnVertex((const HalfEdgeMesh&)*mesh, v, faces);
+        for (uint32 i = 0; i < faces.size; i++) {
+            sumNormals += mesh->faces[faces[i]].normal;
+        }
+        mesh->vertices[v].normal = Normalize(sumNormals);
+
+        faces.Clear();
+    }
+
+    faces.Free();
+}
+
+void ComputeVertexAvgEdgeLengths(HalfEdgeMesh* mesh)
+{
+    DynamicArray<uint32> verts;
+    for (uint32 v = 0; v < mesh->vertices.size; v++) {
+        float sumDists = 0.0f;
+        VerticesOnVertex((const HalfEdgeMesh&)*mesh, v, verts);
+        for (uint32 i = 0; i < verts.size; i++) {
+            Vec3 edgeVec = mesh->vertices[verts[i]].pos - mesh->vertices[v].pos;
+            sumDists += Mag(edgeVec);
+        }
+        // mesh->vertices[v].avgEdgeLength = sumDists / (float32)verts.size;
+
+        verts.Clear();
+    }
+
+    verts.Free();
+}
+
 // Mesh traversal functions
 void VerticesOnFace(const HalfEdgeMesh& mesh, uint32 f,
-    DynamicArray<Vertex>& out)
+    DynamicArray<uint32>& out)
 {
     uint32 edge = mesh.faces[f].halfEdge;
     uint32 e = edge;
     do {
-        out.Append(mesh.vertices[mesh.halfEdges[e].vertex]);
+        out.Append(mesh.halfEdges[e].vertex);
         e = mesh.halfEdges[e].next;
     } while (e != edge);
 }
 void EdgesOnFace(const HalfEdgeMesh& mesh, uint32 f,
-    DynamicArray<HalfEdge>& out)
+    DynamicArray<uint32>& out)
 {
     uint32 edge = mesh.faces[f].halfEdge;
     uint32 e = edge;
     do {
-        out.Append(mesh.halfEdges[e]);
+        out.Append(e);
         e = mesh.halfEdges[e].next;
     } while (e != edge);
 }
 void FacesOnFace(const HalfEdgeMesh& mesh, uint32 f,
-    DynamicArray<Face>& out)
+    DynamicArray<uint32>& out)
 {
     uint32 edge = mesh.faces[f].halfEdge;
     uint32 e = edge;
     do {
         uint32 twin = mesh.halfEdges[e].twin;
-        out.Append(mesh.faces[mesh.halfEdges[twin].face]);
+        out.Append(mesh.halfEdges[twin].face);
         e = mesh.halfEdges[e].next;
     } while (e != edge);
 }
 
 void VerticesOnEdge(const HalfEdgeMesh& mesh, uint32 e,
-    DynamicArray<Vertex>& out)
+    DynamicArray<uint32>& out)
 {
+    uint32 twin = mesh.halfEdges[e].twin;
+    out.Append(mesh.halfEdges[e].vertex);
+    out.Append(mesh.halfEdges[twin].vertex);
 }
 void FacesOnEdge(const HalfEdgeMesh& mesh, uint32 e,
-    DynamicArray<Face>& out)
+    DynamicArray<uint32>& out)
 {
+    uint32 twin = mesh.halfEdges[e].twin;
+    out.Append(mesh.halfEdges[e].face);
+    out.Append(mesh.halfEdges[twin].face);
 }
 
 void VerticesOnVertex(const HalfEdgeMesh& mesh, uint32 v,
-    DynamicArray<Vertex>& out)
+    DynamicArray<uint32>& out)
 {
+    uint32 edge = mesh.vertices[v].halfEdge;
+    uint32 e = edge;
+    do {
+        out.Append(mesh.halfEdges[e].vertex);
+        uint32 twin = mesh.halfEdges[e].twin;
+        e = mesh.halfEdges[twin].next;
+    } while (e != edge);
 }
 void EdgesOnVertex(const HalfEdgeMesh& mesh, uint32 v,
-    DynamicArray<Vertex>& out)
+    DynamicArray<uint32>& out)
 {
+    uint32 edge = mesh.vertices[v].halfEdge;
+    uint32 e = edge;
+    do {
+        out.Append(e);
+        uint32 twin = mesh.halfEdges[e].twin;
+        e = mesh.halfEdges[twin].next;
+    } while (e != edge);
 }
 void FacesOnVertex(const HalfEdgeMesh& mesh, uint32 v,
-    DynamicArray<Vertex>& out)
+    DynamicArray<uint32>& out)
 {
+    uint32 edge = mesh.vertices[v].halfEdge;
+    uint32 e = edge;
+    do {
+        out.Append(mesh.halfEdges[e].face);
+        uint32 twin = mesh.halfEdges[e].twin;
+        e = mesh.halfEdges[twin].next;
+    } while (e != edge);
 }
