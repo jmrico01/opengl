@@ -195,7 +195,7 @@ void FilterULSmooth(FilterEntry* entry, SharedState* state)
 {
     const uint32 MAX_ITERS = 100000;
     UIntFloatData* data = (UIntFloatData*)entry->data;
-    uint32 iterations = min(data->uintValue, MAX_ITERS);
+    uint32 iterations = std::min(data->uintValue, MAX_ITERS);
     float32 delta = data->floatValue;
 
     DynamicArray<uint32> vertices = state->selectedVerts;
@@ -232,7 +232,7 @@ void FilterUSharpen(FilterEntry* entry, SharedState* state)
 {
     const uint32 MAX_ITERS = 100000;
     UIntFloatData* data = (UIntFloatData*)entry->data;
-    uint32 iterations = min(data->uintValue, MAX_ITERS);
+    uint32 iterations = std::min(data->uintValue, MAX_ITERS);
     float32 delta = data->floatValue;
 
     DynamicArray<uint32> vertices = state->selectedVerts;
@@ -432,29 +432,6 @@ internal void FilterUpdateNoArgs(FilterEntry* entry, Vec3 pos,
         mousePos, clickState);
 }
 
-internal void FilterUpdateSingleUInt(FilterEntry* entry, Vec3 pos,
-    RectGL rectGL, TextGL textGL, const FontFace& font,
-    Vec2 mousePos, int clickState, KeyEvent* keyBuf, uint32 keyBufSize)
-{
-    Vec2 size = {
-        FILTER_BOX_WIDTH,
-        2.0f * (float32)font.height + 10.0f
-    };
-    DrawFilterBase(entry, pos, size, rectGL, textGL, font,
-        mousePos, clickState);
-
-    SingleUIntData* data = (SingleUIntData*)entry->data;
-    Vec2 pos2D = { pos.x, pos.y };
-    Vec2 inputSize = { size.x, (float32)font.height };
-    data->inputValue.box.origin = pos2D;
-    data->inputValue.box.size = inputSize;
-    UpdateInputFields(&data->inputValue, 1, mousePos, clickState,
-        keyBuf, keyBufSize);
-    DrawInputFields(&data->inputValue, 1, rectGL, textGL, font);
-
-    data->value = (uint32)strtol(data->inputValue.text, nullptr, 10);
-}
-
 internal void FilterUpdateSingleFloat(FilterEntry* entry, Vec3 pos,
     RectGL rectGL, TextGL textGL, const FontFace& font,
     Vec2 mousePos, int clickState, KeyEvent* keyBuf, uint32 keyBufSize)
@@ -577,29 +554,6 @@ internal void FilterCreateNoArgs(Button* button, void* data,
     filters_.Append(entry);
 }
 
-internal void FilterCreateSingleUInt(Button* button, void* data,
-    const char* initVal, FilterApplyFunc filterFunc)
-{
-    FilterEntry entry = FilterButtonBase(button);
-    entry.updateFunc = FilterUpdateSingleUInt;
-    entry.applyFunc = filterFunc;
-
-    SingleUIntData* d =
-        (SingleUIntData*)malloc(sizeof(SingleUIntData));
-    d->inputValue = CreateInputField(
-        Vec2::zero, Vec2::zero,
-        initVal,
-        { 1.0f, 1.0f, 1.0f, 0.2f },
-        { 1.0f, 1.0f, 1.0f, 0.4f },
-        { 1.0f, 1.0f, 1.0f, 0.5f },
-        { 1.0f, 1.0f, 1.0f, 0.9f }
-    );
-
-    entry.data = (void*)d;
-
-    filters_.Append(entry);
-}
-
 internal void FilterCreateSingleFloat(Button* button, void* data,
     const char* initVal, FilterApplyFunc filterFunc)
 {
@@ -682,10 +636,10 @@ void FilterButtonSelect(Button* button, void* data)
             iStr += sprintf(selectionStr + iStr, ", ");
         }
     }
-    sprintf(selectionStr + iStr, "\0");
+    //sprintf(selectionStr + iStr, "\0");
 
     if (state->selectedVerts.size == 0) {
-        sprintf(selectionStr, "ALL\0");
+        sprintf(selectionStr, "ALL");
     }
 
     FilterEntry entry = FilterButtonBase(button);
