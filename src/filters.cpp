@@ -355,6 +355,15 @@ void FilterTruncate(FilterEntry* entry, SharedState* state)
     printf("Truncated with parameter %f\n", param);
 }
 
+void FilterTriangleTopology(FilterEntry* entry, SharedState* state)
+{
+    printf("tri top\n");
+}
+void FilterLoopSubdivision(FilterEntry* entry, SharedState* state)
+{
+    printf("loop subdivision\n");
+}
+
 internal void DrawFilterBase(FilterEntry* entry, Vec3 pos, Vec2 size,
     RectGL rectGL, TextGL textGL, const FontFace& font,
     Vec2 mousePos, int clickState)
@@ -432,7 +441,7 @@ internal void FilterUpdateNoArgs(FilterEntry* entry, Vec3 pos,
 {
     Vec2 size = {
         FILTER_BOX_WIDTH,
-        2.0f * (float32)font.height + 10.0f
+        1.0f * (float32)font.height + 10.0f
     };
     DrawFilterBase(entry, pos, size, rectGL, textGL, font,
         mousePos, clickState);
@@ -713,4 +722,13 @@ void FilterButtonTriangulate(Button* button, void* data)
 void FilterButtonTruncate(Button* button, void* data)
 {
     FilterCreateSingleFloat(button, data, "0", FilterTruncate);
+}
+
+void FilterButtonTriangleTopology(Button* button, void* data)
+{
+    FilterCreateNoArgs(button, data, FilterTriangleTopology);
+}
+void FilterButtonLoopSubdivision(Button* button, void* data)
+{
+    FilterCreateNoArgs(button, data, FilterLoopSubdivision);
 }

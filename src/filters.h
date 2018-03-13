@@ -42,9 +42,14 @@ void FilterButtonWacky(Button* button, void* data);
 void FilterButtonNoise(Button* button, void* data);
 void FilterButtonULSmooth(Button* button, void* data);
 void FilterButtonUSharpen(Button* button, void* data);
+void FilterButtonCFLSmooth(Button* button, void* data);
+void FilterButtonSDmooth(Button* button, void* data);
 
 void FilterButtonTriangulate(Button* button, void* data);
 void FilterButtonTruncate(Button* button, void* data);
+
+void FilterButtonTriangleTopology(Button* button, void* data);
+void FilterButtonLoopSubdivision(Button* button, void* data);
 
 // Filter actions (bread & butter)
 struct ModelLoadData
@@ -84,23 +89,27 @@ struct FilterInfo {
     const char* name;
     ButtonCallback callback;
 } filterInfo_[] = {
-    { "Select",         FilterButtonSelect },
-    { "",               FilterButtonNone },
-    { "Translate",      FilterButtonTranslate },
-    { "Rotate",         FilterButtonRotate },
-    { "Scale",          FilterButtonScale },
-    { "",               FilterButtonNone },
-    { "Twist",          FilterButtonTwist },
-    { "Inflate",        FilterButtonInflate },
-    { "Wacky",          FilterButtonWacky },
-    { "",               FilterButtonNone },
-    { "Noise",          FilterButtonNoise },
-    { "U.L. Smooth",    FilterButtonULSmooth },
-    { "U. Sharpen",     FilterButtonUSharpen },
-    { "",               FilterButtonNone },
-    { "Triangulate",    FilterButtonTriangulate },
-    { "Truncate",       FilterButtonTruncate }
+    { "Select",             FilterButtonSelect },
+    { "",                   FilterButtonNone },
+    { "Translate",          FilterButtonTranslate },
+    { "Rotate",             FilterButtonRotate },
+    { "Scale",              FilterButtonScale },
+    { "",                   FilterButtonNone },
+    { "Twist",              FilterButtonTwist },
+    { "Inflate",            FilterButtonInflate },
+    { "Wacky",              FilterButtonWacky },
+    { "",                   FilterButtonNone },
+    { "Noise",              FilterButtonNoise },
+    { "U.L. Smooth",        FilterButtonULSmooth },
+    { "U. Sharpen",         FilterButtonUSharpen },
+    { "",                   FilterButtonNone },
+    { "Triangulate",        FilterButtonTriangulate },
+    { "Truncate",           FilterButtonTruncate },
+    { "",                   FilterButtonNone },
+    { "Triangle Topology",  FilterButtonTriangleTopology },
+    { "Loop Subdivision",   FilterButtonLoopSubdivision },
 };
+
 const int numFilters_ = sizeof(filterInfo_) / sizeof(filterInfo_[0]);
 
 global_var DynamicArray<FilterEntry> filters_;
