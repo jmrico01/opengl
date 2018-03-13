@@ -317,7 +317,7 @@ int main(int argc, char* argv[])
     }
 
     DynamicArray<Button> miscButtons;
-    {
+    { // Create other UI buttons
         const char* faceText = "Use Face Normals";
         miscButtons.Append(CreateButton(
             { 500.0f, 10.0f },
@@ -359,6 +359,7 @@ int main(int argc, char* argv[])
         ));
     }
 
+    // Create buttons for adding filters
     DynamicArray<Button> filterButtons;
     for (int i = 0; i < numFilters_; i++) {
         Vec2 origin = { 10.0f, 10.0f + 1.1f * cmSerif.height * i };
@@ -384,7 +385,7 @@ int main(int argc, char* argv[])
     state.meshGL = LoadHalfEdgeMeshGL(state.mesh, useSmoothNormals_);
 
     glfwSetFramebufferSizeCallback(window, FramebufferSizeCallback);
-    // Set up input handling.
+    // Set up input handling
     glfwSetCharModsCallback(window, &CharModsCallback);
     glfwSetKeyCallback(window, &KeyCallback);
     glfwSetMouseButtonCallback(window, &MouseCallback);
