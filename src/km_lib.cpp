@@ -25,16 +25,9 @@ DynamicArray<T>::DynamicArray(uint32 capacity)
 template <typename T>
 DynamicArray<T> DynamicArray<T>::Copy() const
 {
-    DynamicArray<T> array;
+    DynamicArray<T> array(capacity);
 
     array.size = size;
-    array.capacity = capacity;
-    array.data = (T*)malloc(sizeof(T) * array.capacity);
-    if (!array.data) {
-        // TODO error!
-        printf("ERROR: not enough memory!\n");
-    }
-
     for (uint32 i = 0; i < array.size; i++) {
         array.data[i] = data[i];
     }

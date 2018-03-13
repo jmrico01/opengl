@@ -32,7 +32,8 @@ struct SharedState
     HalfEdgeMesh mesh;
     HalfEdgeMeshGL meshGL;
 
-    DynamicArray<uint32> selectedFaces;
+    DynamicArray<uint32> selectedVerts;
+    DynamicArray<uint32> allVerts;
 };
 
 char* GetAppPath();
@@ -41,3 +42,6 @@ void CatStrings(const char* str1, const char* str2, char* dest, uint64 destLen);
 // Returns a ReadFileResult containing the file data and size.
 // free(..) must be called on the file data when done.
 ReadFileResult ReadFile(const char* path);
+
+// Transform from homogeneous coordinates to screen (pixel) coordinates
+Mat4 HomogeneousToScreen();

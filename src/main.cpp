@@ -189,6 +189,12 @@ ReadFileResult ReadFile(const char* path)
     return result;
 }
 
+Mat4 HomogeneousToScreen()
+{
+    return Scale({ (float32)width_, (float32)height_, 1.0f })
+        * Translate({ 0.5f, 0.5f, 0.0f }) * Scale({ 0.5f, 0.5f, 1.0f });
+}
+
 void UseFaceNormals(Button* button, void* data)
 {
     useSmoothNormals_ = false;
@@ -198,6 +204,12 @@ void UseVertexNormals(Button* button, void* data)
 {
     useSmoothNormals_ = true;
     printf("Now rendering with vertex normals\n");
+}
+
+void ClearSelection(Button* button, void* data)
+{
+    SharedState* state = (SharedState*)data;
+    state->selectedVerts.Clear();
 }
 
 int main(int argc, char* argv[])
@@ -292,8 +304,7 @@ int main(int argc, char* argv[])
         ModelLoadData* modelLoadData =
             (ModelLoadData*)malloc(sizeof(ModelLoadData));
         modelLoadData->inputField = CreateInputField(
-            Vec2::zero,
-            { 200.0f, (float32)cmSerif16.height },
+            Vec2::zero, Vec2::zero,
             MODEL_START,
             { 1.0f, 1.0f, 1.0f, 0.2f },
             { 1.0f, 1.0f, 1.0f, 0.4f },
@@ -305,10 +316,10 @@ int main(int argc, char* argv[])
         filters_.Append(modelLoadFilter);
     }
 
-    Button normalButtons[2];
+    DynamicArray<Button> miscButtons;
     {
         const char* faceText = "Use Face Normals";
-        normalButtons[0] = CreateButton(
+        miscButtons.Append(CreateButton(
             { 500.0f, 10.0f },
             {
                 (float32)GetTextWidth(cmSerif16, faceText),
@@ -319,9 +330,9 @@ int main(int argc, char* argv[])
             { 1.0f, 1.0f, 0.0f, 0.5f },
             { 1.0f, 1.0f, 0.0f, 0.6f },
             { 0.8f, 0.8f, 0.8f, 1.0f }
-        );
+        ));
         const char* vertexText = "Use Vertex Normals";
-        normalButtons[1] = CreateButton(
+        miscButtons.Append(CreateButton(
             { 500.0f, 10.0f + cmSerif16.height + 10.0f },
             {
                 (float32)GetTextWidth(cmSerif16, vertexText),
@@ -332,7 +343,20 @@ int main(int argc, char* argv[])
             { 1.0f, 1.0f, 0.0f, 0.5f },
             { 1.0f, 1.0f, 0.0f, 0.6f },
             { 0.8f, 0.8f, 0.8f, 1.0f }
-        );
+        ));
+        const char* clearSelectText = "Clear Selection";
+        miscButtons.Append(CreateButton(
+            { 800.0f, 10.0f },
+            {
+                (float32)GetTextWidth(cmSerif16, clearSelectText),
+                (float32)cmSerif16.height
+            },
+            clearSelectText, ClearSelection,
+            { 1.0f, 1.0f, 0.0f, 0.2f },
+            { 1.0f, 1.0f, 0.0f, 0.5f },
+            { 1.0f, 1.0f, 0.0f, 0.6f },
+            { 0.8f, 0.8f, 0.8f, 1.0f }
+        ));
     }
 
     DynamicArray<Button> filterButtons;
@@ -381,14 +405,14 @@ int main(int argc, char* argv[])
         QuatFromAngleUnitAxis(PI_F / 6.0f, Vec3::unitX)
         * QuatFromAngleUnitAxis(-PI_F / 4.0f, Vec3::unitY);
 
+    int clickStatePrev = clickState_;
     int enterState = GLFW_RELEASE, enterStatePrev = GLFW_RELEASE;
     printf("\n");
 
     while (!glfwWindowShouldClose(window)) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // Get mouse position
-        {
+        { // Get mouse position
             double mouseX, mouseY;
             glfwGetCursorPos(window, &mouseX, &mouseY);
             mouseY = (double)height_ - mouseY;
@@ -426,19 +450,89 @@ int main(int argc, char* argv[])
             Vec3 v2 = Vec3::zero;
             v2.e[i] = AXIS_LINE_LEN / 2.0f;
             Vec4 color = { 0.2f, 0.2f, 0.2f, 1.0f };
-            color.e[i] = 1.0f;
 
-            DrawLine(lineGL, proj, view, v1, v2, color);
+            color.e[i] = 0.4f;
+            DrawLine(lineGL, proj, view, v1, Vec3::zero, color);
+            color.e[i] = 1.0f;
+            DrawLine(lineGL, proj, view, Vec3::zero, v2, color);
         }
 
         glDisable(GL_DEPTH_TEST);
         // 3D rendering end
 
+        { // Mesh vertex selection
+            DynamicArray<MouseCastFaceOut> mouseCastFaces;
+            MouseCastMeshFaces(state.mesh, mousePos,
+                proj, view, width_, height_,
+                mouseCastFaces);
+            
+            uint32 closest = mouseCastFaces.size;
+            float closestDist = 1000.0f;
+            for (uint32 i = 0; i < mouseCastFaces.size; i++) {
+                if (mouseCastFaces[i].dist < closestDist) {
+                    closestDist = mouseCastFaces[i].dist;
+                    closest = i;
+                }
+            }
+
+            if (closest != mouseCastFaces.size) {
+                bool add = false;
+                if ((clickState_ & CLICKSTATE_LEFT_PRESS) != 0
+                && (clickStatePrev & CLICKSTATE_LEFT_PRESS) == 0) {
+                    add = true;
+                }
+
+                Mat4 toScreen = HomogeneousToScreen();
+                uint32 edge = state.mesh.faces[
+                    mouseCastFaces[closest].face].halfEdge;
+                uint32 e = edge;
+                do {
+                    uint32 v = state.mesh.halfEdges[e].vertex;
+                    Vec3 vWorld = state.mesh.vertices[v].pos;
+                    Vec4 vWorld4 = { vWorld.x, vWorld.y, vWorld.z, 1.0f };
+                    Vec4 vScreen4 = proj * view * vWorld4;
+                    vScreen4 /= vScreen4.w;
+                    vScreen4 = toScreen * vScreen4;
+                    Vec3 vScreen = { vScreen4.x, vScreen4.y, vScreen4.z };
+
+                    DrawRect(rectGL, vScreen, { 0.5f, 0.5f }, { 6.0f, 6.0f },
+                        { 1.0f, 0.0f, 1.0f, 0.6f });
+                    if (add) {
+                        bool present = false;
+                        for (uint32 i = 0; i < state.selectedVerts.size; i++) {
+                            if (state.selectedVerts[i] == v) {
+                                present = true;
+                                break;
+                            }
+                        }
+                        if (!present) {
+                            state.selectedVerts.Append(v);
+                        }
+                    }
+
+                    e = state.mesh.halfEdges[e].next;
+                } while (e != edge);
+            }
+
+            Mat4 toScreen = HomogeneousToScreen();
+            for (uint32 i = 0; i < state.selectedVerts.size; i++) {
+                Vec3 vWorld = state.mesh.vertices[state.selectedVerts[i]].pos;
+                Vec4 vWorld4 = { vWorld.x, vWorld.y, vWorld.z, 1.0f };
+                Vec4 vScreen4 = proj * view * vWorld4;
+                vScreen4 /= vScreen4.w;
+                vScreen4 = toScreen * vScreen4;
+                Vec3 vScreen = { vScreen4.x, vScreen4.y, vScreen4.z };
+
+                DrawRect(rectGL, vScreen, { 0.5f, 0.5f }, { 6.0f, 6.0f },
+                    { 1.0f, 0.0f, 1.0f, 1.0f });
+            }
+        }
+
         bool applyFilters = false;
 
         uint32 nfPrev = filters_.size;
         UpdateButtons(filterButtons.data, filterButtons.size,
-            mousePos, clickState_, nullptr);
+            mousePos, clickState_, &state);
         DrawButtons(filterButtons.data, filterButtons.size,
             rectGL, textGL, cmSerif);
         if (nfPrev != filters_.size) {
@@ -446,8 +540,10 @@ int main(int argc, char* argv[])
         }
 
         bool smoothNormalsPrev = useSmoothNormals_;
-        UpdateButtons(normalButtons, 2, mousePos, clickState_, nullptr);
-        DrawButtons(normalButtons, 2, rectGL, textGL, cmSerif16);
+        UpdateButtons(miscButtons.data, miscButtons.size,
+            mousePos, clickState_, &state);
+        DrawButtons(miscButtons.data, miscButtons.size,
+            rectGL, textGL, cmSerif16);
         if (smoothNormalsPrev != useSmoothNormals_) {
             applyFilters = true;
         }
@@ -459,7 +555,7 @@ int main(int argc, char* argv[])
         filterOrigin.y += (float32)cmSerif16.height;
         for (uint32 i = 0; i < filters_.size; i++) {
             Vec3 filterPos = filterOrigin;
-            filterPos.y += 100.0f * i;
+            filterPos.y += 3.0f * (float32)cmSerif16.height * i;
             filters_[i].updateFunc(&filters_[i], filterPos,
                 rectGL, textGL, cmSerif16,
                 mousePos, clickState_, keyInputBuffer, keyInputBufferSize);
@@ -492,7 +588,14 @@ int main(int argc, char* argv[])
         if (applyFilters
         || (enterState == GLFW_PRESS && enterStatePrev == GLFW_RELEASE)) {
             printf("=> Reapplying filter list...\n");
-            for (uint32 i = 0; i < filters_.size; i++) {
+            // Re-load mesh first
+            filters_[0].applyFunc(&filters_[0], &state);
+            state.selectedVerts.Clear();
+            state.allVerts.Clear();
+            for (uint32 v = 0; v < state.mesh.vertices.size; v++) {
+                state.allVerts.Append(v);
+            }
+            for (uint32 i = 1; i < filters_.size; i++) {
                 filters_[i].applyFunc(&filters_[i], &state);
             }
             printf("-> Reloading mesh into OpenGL...\n");
@@ -504,6 +607,7 @@ int main(int argc, char* argv[])
         // Clear all key events
         keyInputBufferSize = 0;
 
+        clickStatePrev = clickState_;
         glfwSwapBuffers(window);
         glfwPollEvents();
         

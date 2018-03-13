@@ -29,6 +29,8 @@ void FilterUpdateModelLoad(FilterEntry* entry, Vec3 pos,
 // Button press (add to filter list)
 void FilterButtonNone(Button* button, void* data);
 
+void FilterButtonSelect(Button* button, void* data);
+
 void FilterButtonTranslate(Button* button, void* data);
 void FilterButtonRotate(Button* button, void* data);
 void FilterButtonScale(Button* button, void* data);
@@ -50,6 +52,11 @@ struct ModelLoadData
     InputField inputField;
 };
 void FilterModelLoad(FilterEntry* entry, SharedState* state);
+
+struct SelectData
+{
+    InputField inputField;
+};
 
 struct SingleUIntData
 {
@@ -77,6 +84,8 @@ struct FilterInfo {
     const char* name;
     ButtonCallback callback;
 } filterInfo_[] = {
+    { "Select",         FilterButtonSelect },
+    { "",               FilterButtonNone },
     { "Translate",      FilterButtonTranslate },
     { "Rotate",         FilterButtonRotate },
     { "Scale",          FilterButtonScale },

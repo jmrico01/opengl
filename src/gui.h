@@ -5,7 +5,7 @@
 #include "main.h"
 #include "text.h"
 
-#define INPUT_BUFFER_SIZE 128
+#define INPUT_BUFFER_SIZE 2048
 
 enum ClickStateFlags {
     CLICKSTATE_NONE = 0,

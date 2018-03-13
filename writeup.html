@@ -1,0 +1,288 @@
+<head>
+    <title> COS426 Assignment 2 &mdash; Modeling &mdash; Writeup</title>
+    <link href="css/style.css" type="text/css" rel="stylesheet"/>
+</head>
+
+<body>
+    <script src="js/student.js"> </script>
+    <script src="js/writeup.js"> </script>
+    <div class="top">
+    <div class="main_div">
+
+        <h1> <div class=assignment>COS426 Assignment 2</div>Modeling &mdash; Writeup</h1>
+        <h2>Switch to: <a href='index.html'>Interactive Editor</a></h2>
+        <div class='selectable'>
+        <h2 id='student'></h2>
+        
+        Features Implemented:
+<ul>
+<li>(3.0) <a href='#Translation'>Translation</a></li>
+<li>(1.0) <a href='#Rotation'>Rotation</a></li>
+<li>(0.5) <a href='#Scale'>Scale</a></li>
+<li>(1.5) <a href='#Traversal'>Traversal</a></li>
+<li>(0.5) <a href='#Face+Area'>Face Area</a></li>
+<li>(0.5) <a href='#Per-vertex+Normals'>Per-vertex Normals</a></li>
+<li>(0.5) <a href='#Average+Edge+Lengths'>Average Edge Lengths</a></li>
+<li>(0.5) <a href='#Twist'>Twist</a></li>
+<li>(1.0) <a href='#Inflate'>Inflate</a></li>
+<li>(1.0) <a href='#Wacky'>Wacky</a></li>
+<li>(1.0) <a href='#Noise'>Noise</a></li>
+<li>(1.5) <a href='#Smooth'>Smooth</a></li>
+<li>(1.0) <a href='#Sharpen'>Sharpen</a></li>
+<!-- <li>(1.0) <a href='#Bilateral+Smooth'>Bilateral Smooth</a></li>
+<li>(2.0) <a href='#Curvature'>Curvature</a></li> -->
+<li>(0.5) <a href='#Triangulate'>Triangulate</a></li>
+<li>(2.0) <a href='#Truncate'>Truncate</a></li>
+<!-- <li>(2.0) <a href='#Extrude'>Extrude</a></li>
+<li>(1.0) <a href='#Bevel'>Bevel</a></li>
+<li>(1.0) <a href='#Split+Long+Edges'>Split Long Edges</a></li>
+<li>(1.0) <a href='#Triangle+Topology'>Triangle Topology</a></li>
+<li>(1.0) <a href='#Loop+Subdivision'>Loop Subdivision</a></li>
+<li>(1.0) <a href='#Quad+Topology'>Quad Topology</a></li>
+<li>(1.0) <a href='#Catmull-Clark+Subdivision'>Catmull-Clark Subdivision</a></li> 
+<li>(1.0) <a href='#Art+Contest'>Art Contest</a></li>
+        </ul></div>-->
+
+<p><hr><p><a name='Important Note'></a><h2>Important Note</h2><p><hr><p>
+
+    I developed this assignment from scratch in C++, using OpenGL and GLFW for cross-platform window creation, input handling, and GL context creation and binding. I recreated the JS GUI as well as I could.
+
+    <p>
+    This does mean, however, that I had to re-implement the entirety of the systems that are given to us. There include, but are probably not limited to:
+    <ul>
+        <li>Half Edge mesh data structure</li>
+        <li>Parsing OBJ files into a Half Edge mesh</li>
+        <li>Loading and rendering arbitrary meshes in OpenGL</li>
+        <li>Basic diffuse shading with GLSL</li>
+        <li>Hot re-loading of meshes after modifications, with the option of selecting between vertex or face normals</li>
+        <li>Filter selection, compounding, and removal system</li>
+        <li>Mouse position raycasting against 3D mesh, closest face collision detection</li>
+        <li>Text rendering, with the help of Freetype</li>
+        <li>Interactive GUI elements in pixel coordinates</li>
+        <li>Math library with Vectors, Matrices, Quaternions</li>
+    </ul>
+
+    <p>
+    In his office hours on March 9, Amit Bermano said a C++ implementation would be acceptable, and that I should turn it in as a Windows executable file, which is what I have done. The two external libraries I used (GLFW and Freetype) are statically linked, so program should require no external libraries other than the Visual C++ runtime (the latest one should work).
+
+    <p>
+    The GUI controls are similar to the ones in the JS application. Clicking and dragging rotates the camera, scrolling controls the zoom, and clicking on the filters adds them to the active filters list. The red/green/blue lines correspond to the x/y/z axes, with the more colorful halves of the lines representing the positive direction.
+    
+    <p>
+    One of the main differences is that there are no parameter sliders: each value must be typed in (click the input field, and type the value). Since the implementation of these secondary systems (GUI input, etc) wasn't the main objective of the assignment, they are not tested for robustness, so please don't actively try to break them (unless you find that amusing, of course).
+    
+    <p>
+    Another significant difference is how vertex selection works. You can select vertices by clicking faces, but you can't select vertices one-by-one, because I wasn't sure how to make them easily clickable. In order to use this selection as a Filter, you must manually add a "Select" filter with the selection you desire. You always have the option to type in vertex indices into this selection filter box.
+
+<p><hr><p><a name='Translation'></a><h2>Translation</h2><p><hr><p>
+    Implemented near the top of filters.cpp.
+
+    <p>
+    Loop through every vertex, add the offset vector to its position.
+
+    <p>
+    Translate(3, 0, 0):
+    <p>
+    <img src='results/translate1.png'>
+    <p>
+
+<p><hr><p><a name='Rotation'></a><h2>Rotation</h2><p><hr><p>
+    Implemented near the top of filters.cpp.
+
+    <p>
+    Using my Quaternion implementations in the math library (km_math.h), I compounded three rotations along the unit axes in the required order (x-y-z), and multiplied each vertex position of the model by these quaternions.
+
+<br><img src='results/rotate1.png'><br>
+<br><img src='results/rotate2.png'><br>
+<br><img src='results/rotate3.png'>
+
+<p><hr><p><a name='Scale'></a><h2>Scale</h2><p><hr><p>
+    Implemented near the top of filters.cpp.
+
+    <p>
+    I multiplied each vertex position by the scalar value of the scale magnitude.
+
+<br><img src='results/scale1.png'><br>
+<br><img src='results/scale2.png'>
+
+<p><hr><p><a name='Traversal'></a><h2>Traversal</h2><p><hr><p>
+    Implemented at the bottom of halfedge.cpp.
+    
+    <p>
+        For the adjacent elements of faces, I started at the half-edge that the face points to, and looped around, following each half-edge's next element, until I arrived back at the starting half-edge. To get to the vertices, I looked at each half-edge's vertex. To get to the faces, I looked at the face of each half-edge's twin half-edge.
+    <p>
+        For the adjacent elements of edges, I looked at the vertex or face that the given half-edge and its twin half-edge pointed to.
+    <p>
+        For the adjacent elements of vertices, I started at the half-edge that the vertex points to, then followed its twin half-edge, and the next vertex after it, until I arrived back at the starting half-edge. To get to the vertices, I looked at each outgoing half-edge's vertex. To get to the faces, I looked at each outgoing half-edge's face.
+
+<p><hr><p><a name='Face+Area'></a><h2>Face Area</h2><p><hr><p>
+    Implemented in halfedge.cpp
+
+    <p>
+    I implemented a helper function that calculates the area of a triangle. Then, I store the first two vertices of the face, v1 and v2, and loop through every other vertex v. I sum the areas of all the triangles (v1, v2, v) to get the area of the face.
+
+<p><hr><p><a name='Per-vertex+Normals'></a><h2>Per-vertex Normals</h2><p><hr><p>
+    Implemented in halfedge.cpp
+
+    <p>
+    I loop through each face adjacent to the given vertex, and set the vertex's normal to the average of the face normals. The image below shows the effect of using per-vertex normals in the basic diffuse shading model used to render these meshes. Very smooth, compared to what it looks like in the Rotation images.
+
+<br><img src='results/vertexNormals1.png'>
+
+<p><hr><p><a name='Average+Edge+Lengths'></a><h2>Average Edge Lengths</h2><p><hr><p>
+    Implemented in halfedge.cpp
+
+    <p>
+    I loop through each vertex adjacent to the given vertex, and set the vertex's average edge length to the average distance to each adjacent vertex. The image below is a visualization of the average edge lengths per vertex, which are displayed as the red component of the vertex colors sent to the shaders.
+
+<br><img src='results/avgEdgeLengths1.png'>
+
+<p><hr><p><a name='Twist'></a><h2>Twist</h2><p><hr><p>
+    Implemented near the top of filters.cpp.
+
+    <p>
+    I rotate each vertex about the y-axis by the product of its y coordinate and the twist parameter, using Quaternions. I used per-vertex normals in the images below to make them look nicer.
+
+<br><img src='results/twist1.png'><br>
+<br><img src='results/twist2.png'>
+
+<p><hr><p><a name='Inflate'></a><h2>Inflate</h2><p><hr><p>
+    Implemented near the top of filters.cpp.
+
+    <p>
+    Having computed vertex normals and average edge lengths for the mesh, I add each vertex normal, scaled by the inflate parameter and the average edge length for the vertex, to every vertex in the mesh.
+
+<br><img src='results/inflate1.png'><br>
+<br><img src='results/inflate2.png'><br>
+<br><img src='results/inflate3.png'>
+
+<p><hr><p><a name='Wacky'></a><h2>Wacky</h2><p><hr><p>
+    Implemented near the top of filters.cpp.
+
+    <p>
+    I offset the x-component of each vertex by the sine of its y-component, with a fixed period of 0.25. The parameter for this filter controls the magnitude of the scaling.
+
+<br><img src='results/wacky1.png'>
+
+<hr><p><a name='Noise'></a><h2>Noise</h2><p><hr><p>
+    Implemented near the top of filters.cpp.
+
+    <p>
+    For each vertex, I generate a random value between -1 and 1, and scale it according to the noise parameter. I then offset each vertex by its vertex normal, scaled by this random value.
+
+<br><img src='results/noise1.png'><br>
+<br><img src='results/noise2.png'>
+
+<p><hr><p><a name='Smooth'></a><h2>Smooth</h2><p><hr><p>
+    Implemented near the top of filters.cpp.
+
+    <p>
+    For each iteration, I have to maintain a copy of the mesh in order to keep the original vertex positions. For each vertex, I move it in the direction of the average of its adjacent vertices, scaled by the parameter delta.
+
+<br><img src='results/smooth1.png'><br>
+<br><img src='results/smooth3.png'><br>
+<br><img src='results/smooth2.png'>
+
+<p><hr><p><a name='Sharpen'></a><h2>Sharpen</h2><p><hr><p>
+    Implemented near the top of filters.cpp.
+
+    <p>
+    The same as Smooth, but each vertex moves in the opposite direction.
+
+<br><img src='results/sharpen1.png'><br> 
+<br><img src='results/sharpen2.png'><br>
+<br><img src='results/sharpen3.png'>
+
+<!--
+<p><hr><p><a name='Bilateral+Smooth'></a><h2>Bilateral Smooth</h2><p><hr><p>
+(Your description of your implentation of Bilateral Smooth goes here...)
+
+<br>You can include as many results as you want, but please at least include the following results:<p><hr><p><a name='Curvature'></a><h2>Curvature</h2><p><hr><p>
+(Your description of your implentation of Curvature goes here...)
+
+<br>You can include as many results as you want, but please at least include the following results:
+-->
+<p><hr><p><a name='Triangulate'></a><h2>Triangulate</h2><p><hr><p>
+    Implemented as TriangulateMesh in halfedge.cpp
+
+    <p>
+    For each face, I start looping through its edges. As long as I find 4 distinct edges in the face, I split the face using SplitFaceMakeEdge (which I had to implement myself), such that a new triangular face is created, which I append to the mesh.
+
+    <p>
+    Since my GUI doesn't indicate where the edges are, I've picked some triangles and scaled them up so that the seams are visible. I suppose it wouldn't have been that difficult to enable a wireframe rendering mode.
+
+<br><img src='results/triangulate1.png'><br> 
+<br><img src='results/triangulate2.png'>
+
+<p><hr><p><a name='Truncate'></a><h2>Truncate</h2><p><hr><p>
+    Implemented near the top of filters.cpp.
+
+    <p>
+    This was one of the trickier functions to implement, though the reason it took me so long was that I wasn't properly handling the removal of vertices from my mesh structure (everything is referenced by index, so I must decrease all indices upon removal of a vertex).
+
+    <p>
+    To implement this, I used SplitEdgeMakeVertex, which I also had to implement myself. I built in the parameter "t" into this function. I first split the neighboring edges for each vertex, and then used the old edges to stitch these new vertices together into a new face.
+
+<br><img src='results/truncate1.png'><br>
+<br><img src='results/truncate2.png'>
+
+<!--
+<p><hr><p><a name='Extrude'></a><h2>Extrude</h2><p><hr><p>
+(Your description of your implentation of Extrude goes here...)
+
+<br>You can include as many results as you want, but please at least include the following results:<br> <a href='batch.html?Base_Mesh=tetrahedron.obj&Display_Settings=false;true;flat;false;false;true;false;true;false&Extrude=0.5'>Base_Mesh=tetrahedron.obj&Display_Settings=false;true;flat;false;false;true;false;true;false&Extrude=0.5</a>
+
+<br><img src='results/placeholder.png'><br> <a href='batch.html?Base_Mesh=tetrahedron.obj&Display_Settings=false;true;flat;false;false;true;false;true;false&Selection=;2&Extrude=1'>Base_Mesh=tetrahedron.obj&Display_Settings=false;true;flat;false;false;true;false;true;false&Selection=;2&Extrude=1</a>
+
+<br><img src='results/placeholder.png'><p><hr><p><a name='Bevel'></a><h2>Bevel</h2><p><hr><p>
+(Your description of your implentation of Bevel goes here...)
+
+<br>You can include as many results as you want, but please at least include the following results:<br> <a href='batch.html?Base_Mesh=tetrahedron.obj&Display_Settings=false;true;flat;false;false;true;false;true;false&Bevel=0.5'>Base_Mesh=tetrahedron.obj&Display_Settings=false;true;flat;false;false;true;false;true;false&Bevel=0.5</a>
+
+<br><img src='results/placeholder.png'><br> <a href='batch.html?Base_Mesh=cube.obj&Display_Settings=false;true;flat;false;false;true;false;true;false&Bevel=0.5'>Base_Mesh=cube.obj&Display_Settings=false;true;flat;false;false;true;false;true;false&Bevel=0.5</a>
+
+<br><img src='results/placeholder.png'><p><hr><p><a name='Split+Long+Edges'></a><h2>Split Long Edges</h2><p><hr><p>
+(Your description of your implentation of Split Long Edges goes here...)
+
+<br>You can include as many results as you want, but please at least include the following results:<br> <a href='batch.html?Base_Mesh=tetrahedron.obj&Display_Settings=false;true;flat;false;false;true;false;true;false&Selection=;1&Split_Long_Edges=0.1'>Base_Mesh=tetrahedron.obj&Display_Settings=false;true;flat;false;false;true;false;true;false&Selection=;1&Split_Long_Edges=0.1</a>
+
+<br><img src='results/placeholder.png'><br> <a href='batch.html?Base_Mesh=tetrahedron.obj&Display_Settings=false;true;flat;false;false;true;false;true;false&Selection=;1&Split_Long_Edges=1'>Base_Mesh=tetrahedron.obj&Display_Settings=false;true;flat;false;false;true;false;true;false&Selection=;1&Split_Long_Edges=1</a>
+
+<br><img src='results/placeholder.png'><p><hr><p><a name='Triangle+Topology'></a><h2>Triangle Topology</h2><p><hr><p>
+(Your description of your implentation of Triangle Topology goes here...)
+
+<br>You can include as many results as you want, but please at least include the following results:<br> <a href='batch.html?Base_Mesh=cube.obj&Display_Settings=false;true;flat;false;false;true;false;true;false&Tri_Topology=1'>Base_Mesh=cube.obj&Display_Settings=false;true;flat;false;false;true;false;true;false&Tri_Topology=1</a>
+
+<br><img src='results/placeholder.png'><br> <a href='batch.html?Base_Mesh=cube.obj&Display_Settings=false;true;flat;false;false;true;false;true;false&Tri_Topology=3'>Base_Mesh=cube.obj&Display_Settings=false;true;flat;false;false;true;false;true;false&Tri_Topology=3</a>
+
+<br><img src='results/placeholder.png'><p><hr><p><a name='Loop+Subdivision'></a><h2>Loop Subdivision</h2><p><hr><p>
+(Your description of your implentation of Loop Subdivision goes here...)
+
+<br>You can include as many results as you want, but please at least include the following results:<br> <a href='batch.html?Base_Mesh=cube.obj&Display_Settings=false;true;flat;false;false;true;false;true;false&Loop_Subdivision=3'>Base_Mesh=cube.obj&Display_Settings=false;true;flat;false;false;true;false;true;false&Loop_Subdivision=3</a>
+
+<br><img src='results/placeholder.png'><br> <a href='batch.html?Base_Mesh=teapot.obj&Display_Settings=false;false;flat;false;false;true;false;true;false&Loop_Subdivision=3'>Base_Mesh=teapot.obj&Display_Settings=false;false;flat;false;false;true;false;true;false&Loop_Subdivision=3</a>
+
+<br><img src='results/placeholder.png'><p><hr><p><a name='Quad+Topology'></a><h2>Quad Topology</h2><p><hr><p>
+(Your description of your implentation of Quad Topology goes here...)
+
+<br>You can include as many results as you want, but please at least include the following results:<br> <a href='batch.html?Base_Mesh=dodecahedron.obj&Display_Settings=false;true;flat;false;false;true;false;true;false&Quad_Topology=1'>Base_Mesh=dodecahedron.obj&Display_Settings=false;true;flat;false;false;true;false;true;false&Quad_Topology=1</a>
+
+<br><img src='results/placeholder.png'><br> <a href='batch.html?Base_Mesh=tetrahedron.obj&Display_Settings=false;true;flat;false;false;true;false;true;false&Quad_Topology=3'>Base_Mesh=tetrahedron.obj&Display_Settings=false;true;flat;false;false;true;false;true;false&Quad_Topology=3</a>
+
+<br><img src='results/placeholder.png'><p><hr><p><a name='Catmull-Clark+Subdivision'></a><h2>Catmull-Clark Subdivision</h2><p><hr><p>
+(Your description of your implentation of Catmull-Clark Subdivision goes here...)
+
+<br>You can include as many results as you want, but please at least include the following results:<br> <a href='batch.html?Base_Mesh=tetrahedron.obj&Display_Settings=false;true;flat;false;false;true;false;true;false&Catmull-Clark=2'>Base_Mesh=tetrahedron.obj&Display_Settings=false;true;flat;false;false;true;false;true;false&Catmull-Clark=2</a>
+
+<br><img src='results/placeholder.png'><br> <a href='batch.html?Base_Mesh=cube.obj&Display_Settings=false;true;flat;false;false;true;false;true;false&Catmull-Clark=4'>Base_Mesh=cube.obj&Display_Settings=false;true;flat;false;false;true;false;true;false&Catmull-Clark=4</a>
+
+<br><img src='results/placeholder.png'><p><hr><p><a name='Art+Contest'></a><h2>Art Contest</h2><p><hr><p>
+(Your description of your implentation of Art Contest goes here...)
+
+<br>You can include as many results as you want, but please at least include the following results:
+-->
+
+</div>
+</div>
+</body>
+</html>

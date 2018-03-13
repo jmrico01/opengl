@@ -87,6 +87,11 @@ struct Quat
 	float32 x, y, z, w;
 };
 
+inline float32 Lerp(float32 a, float32 b, float32 t)
+{
+    return a + (b - a) * t;
+}
+
 // ========== OPERATORS & FUNCTIONS ==========
 
 // -------------------- Vec2 --------------------
@@ -170,6 +175,15 @@ inline Vec2& operator/=(Vec2& v, float32 s)
 inline bool operator==(const Vec2& v1, const Vec2& v2)
 {
     return v1.x == v2.x && v1.y == v2.y;
+}
+
+inline Vec2 Lerp(Vec2 v1, Vec2 v2, float t)
+{
+    Vec2 result = {
+        Lerp(v1.x, v2.x, t),
+        Lerp(v1.y, v2.y, t)
+    };
+    return result;
 }
 
 inline float32 Dot(Vec2 v1, Vec2 v2)
@@ -279,6 +293,16 @@ inline Vec3& operator/=(Vec3& v, float32 s)
 inline bool operator==(const Vec3& v1, const Vec3& v2)
 {
     return v1.x == v2.x && v1.y == v2.y && v1.z == v2.z;
+}
+
+inline Vec3 Lerp(Vec3 v1, Vec3 v2, float t)
+{
+    Vec3 result = {
+        Lerp(v1.x, v2.x, t),
+        Lerp(v1.y, v2.y, t),
+        Lerp(v1.z, v2.z, t)
+    };
+    return result;
 }
 
 inline float32 Dot(Vec3 v1, Vec3 v2)

@@ -55,6 +55,7 @@ HalfEdgeMesh HalfEdgeMeshFromObj(const char* fileName)
                 Vertex vertex;
                 vertex.pos = ParseVec3(&line[2]);
                 vertex.halfEdge = 0; // This is set later
+                vertex.color = Vec3::one;
                 mesh.vertices.Append(vertex);
             }
             else if (line[1] == 'n') {
@@ -139,6 +140,7 @@ HalfEdgeMesh HalfEdgeMeshFromObj(const char* fileName)
     faceInds.Free();
     ComputeFaceNormals(&mesh);
     ComputeVertexNormals(&mesh);
+    ComputeVertexAvgEdgeLengths(&mesh);
     //PrintHalfEdgeMesh(mesh);
 
     // TODO free mesh after this
@@ -189,6 +191,30 @@ void PrintHalfEdgeMesh(const HalfEdgeMesh& mesh)
     }
 }
 
+void PrintEdgeEndpoints(const HalfEdgeMesh& mesh, uint32 e)
+{
+    DynamicArray<uint32> verts;
+    VerticesOnEdge(mesh, e, verts);
+    printf("%d -> %d", verts[0], verts[1]);
+}
+
+void PrintHalfEdgeMeshFaces(const HalfEdgeMesh& mesh)
+{
+    printf("----- FACES -----\n");
+    for (uint32 i = 0; i < mesh.faces.size; i++) {
+        printf("Face %d vertices: ", i);
+        uint32 edge = mesh.faces[i].halfEdge;
+        uint32 e = edge;
+        do {
+            printf("%d (e %d: ", mesh.halfEdges[e].vertex, e);
+            PrintEdgeEndpoints(mesh, e);
+            printf("), ");
+            e = mesh.halfEdges[e].next;
+        } while (e != edge);
+        printf("\n");
+    }
+}
+
 HalfEdgeMeshGL LoadHalfEdgeMeshGL(const HalfEdgeMesh& mesh, bool smoothNormals)
 {
     HalfEdgeMesh meshTri = CopyHalfEdgeMesh(mesh);
@@ -198,6 +224,7 @@ HalfEdgeMeshGL LoadHalfEdgeMeshGL(const HalfEdgeMesh& mesh, bool smoothNormals)
     // TODO use indexing for this
     DynamicArray<Vec3> vertices;
     DynamicArray<Vec3> normals;
+    DynamicArray<Vec3> colors;
 
     for (uint32 f = 0; f < meshTri.faces.size; f++) {
         Vec3 normal = meshTri.faces[f].normal;
@@ -210,6 +237,7 @@ HalfEdgeMeshGL LoadHalfEdgeMeshGL(const HalfEdgeMesh& mesh, bool smoothNormals)
                 normal = v.normal;
             }
             normals.Append(normal);
+            colors.Append(v.color);
             e = meshTri.halfEdges[e].next;
         } while (e != edge);
     }
@@ -245,6 +273,20 @@ HalfEdgeMeshGL LoadHalfEdgeMeshGL(const HalfEdgeMesh& mesh, bool smoothNormals)
         (void*)0 // array buffer offset
     );
 
+    glGenBuffers(1, &meshGL.colorBuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, meshGL.colorBuffer);
+    glBufferData(GL_ARRAY_BUFFER, colors.size * sizeof(Vec3),
+        colors.data, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(
+        2, // match shader layout location
+        3, // size (vec3)
+        GL_FLOAT, // type
+        GL_FALSE, // normalized?
+        0, // stride
+        (void*)0 // array buffer offset
+    );
+
     glBindVertexArray(0);
 
     meshGL.programID = LoadShaders(
@@ -260,9 +302,9 @@ void FreeHalfEdgeMeshGL(HalfEdgeMeshGL* meshGL)
 {
     glDeleteBuffers(1, &meshGL->vertexBuffer);
     glDeleteBuffers(1, &meshGL->normalBuffer);
+    glDeleteBuffers(1, &meshGL->colorBuffer);
     glDeleteProgram(meshGL->programID);
     glDeleteVertexArrays(1, &meshGL->vertexArray);
-
 }
 
 void DrawHalfEdgeMeshGL(const HalfEdgeMeshGL& meshGL, Mat4 proj, Mat4 view)
@@ -285,11 +327,82 @@ void DrawHalfEdgeMeshGL(const HalfEdgeMeshGL& meshGL, Mat4 proj, Mat4 view)
 }
 
 // Utility functions
+void RemoveVertex(HalfEdgeMesh* mesh, uint32 v)
+{
+    for (uint32 e = 0; e < mesh->halfEdges.size; e++) {
+        if (mesh->halfEdges[e].vertex > v) {
+            mesh->halfEdges[e].vertex--;
+        }
+        else if (mesh->halfEdges[e].vertex == v) {
+            printf("ERROR: Removed vertex still in use in mesh (%d)\n", v);
+            printf("edge: "); PrintEdgeEndpoints(*mesh, e);
+            printf("\n");
+        }
+    }
+    mesh->vertices.Remove(v);
+}
+
+// Make a new vertex in halfEdge e. t is a value in the range [0, 1]
+// that specifies where in the edge v1 -> v2 the new vertex should be created.
+// Returns the new vertex index.
+uint32 SplitEdgeMakeVertex(HalfEdgeMesh* mesh, uint32 e, float t)
+{
+    if (t < 0.0f || t > 1.0f) {
+        printf("ERROR: SplitEdgeMakeVertex t not in [0, 1]\n");
+        return 0;
+    }
+
+    uint32 twin = mesh->halfEdges[e].twin;
+    uint32 v1 = mesh->halfEdges[twin].vertex;
+    uint32 v2 = mesh->halfEdges[e].vertex;
+
+    // Create new vertex
+    Vertex v;
+    v.halfEdge = mesh->halfEdges.size;
+    v.pos = Lerp(mesh->vertices[v1].pos, mesh->vertices[v2].pos, t);
+    v.color = Lerp(mesh->vertices[v1].color, mesh->vertices[v2].color, t);
+
+    // Create new halfEdges
+    HalfEdge edgeVOut;
+    edgeVOut.next = mesh->halfEdges[e].next;
+    edgeVOut.twin = mesh->halfEdges.size + 1;
+    edgeVOut.vertex = mesh->halfEdges[e].vertex;
+    edgeVOut.face = mesh->halfEdges[e].face;
+    HalfEdge edgeVIn;
+    edgeVIn.next = twin;
+    edgeVIn.twin = mesh->halfEdges.size;
+    edgeVIn.vertex = mesh->vertices.size;
+    edgeVIn.face = mesh->halfEdges[twin].face;
+
+    // Update original halfEdges
+    DynamicArray<uint32> edgesFromV2;
+    EdgesOnVertex((const HalfEdgeMesh&)*mesh, v2, edgesFromV2);
+    for (uint32 i = 0; i < edgesFromV2.size; i++) {
+        uint32 edgeToV2 = mesh->halfEdges[edgesFromV2[i]].twin;
+        if (mesh->halfEdges[edgeToV2].next == twin) {
+            mesh->halfEdges[edgeToV2].next = mesh->halfEdges.size + 1;
+        }
+    }
+    mesh->halfEdges[e].next = mesh->halfEdges.size;
+    mesh->halfEdges[e].vertex = mesh->vertices.size;
+
+    // Ensure the endpoints still have valid halfEdge pointers.
+    mesh->vertices[v1].halfEdge = e;
+    mesh->vertices[v2].halfEdge = mesh->halfEdges.size + 1;
+
+    mesh->vertices.Append(v);
+    mesh->halfEdges.Append(edgeVOut);
+    mesh->halfEdges.Append(edgeVIn);
+
+    edgesFromV2.Free();
+    return mesh->vertices.size - 1;
+}
 
 // Make a new edge v1 -> v2, splitting face f.
 // f will now be v1 -> ... -> v2 -> v1
 // new face will be v2 -> ... -> v1 -> v2
-void SplitFaceMakeEdge(HalfEdgeMesh* mesh, uint32 f, uint32 v1, uint32 v2)
+// Returns the new face index.
+uint32 SplitFaceMakeEdge(HalfEdgeMesh* mesh, uint32 f, uint32 v1, uint32 v2)
 {
     uint32 edge = mesh->faces[f].halfEdge;
     uint32 eToV1 = edge;
@@ -333,6 +446,8 @@ void SplitFaceMakeEdge(HalfEdgeMesh* mesh, uint32 f, uint32 v1, uint32 v2)
     mesh->halfEdges.Append(v1v2);
     mesh->halfEdges.Append(v2v1);
     mesh->faces.Append(newFace);
+
+    return mesh->faces.size - 1;
 }
 
 void TriangulateMesh(HalfEdgeMesh* mesh)
@@ -362,6 +477,7 @@ void TriangulateMesh(HalfEdgeMesh* mesh)
 
     ComputeFaceNormals(mesh);
     ComputeVertexNormals(mesh);
+    ComputeVertexAvgEdgeLengths(mesh);
     //printf("==> TRIANGULATION FINISHED\n");
     //PrintHalfEdgeMesh((const HalfEdgeMesh&)*mesh);
 }
@@ -457,12 +573,70 @@ void ComputeVertexAvgEdgeLengths(HalfEdgeMesh* mesh)
             Vec3 edgeVec = mesh->vertices[verts[i]].pos - mesh->vertices[v].pos;
             sumDists += Mag(edgeVec);
         }
-        // mesh->vertices[v].avgEdgeLength = sumDists / (float32)verts.size;
+        mesh->vertices[v].avgEdgeLength = sumDists / (float32)verts.size;
+        //mesh->vertices[v].color.r = mesh->vertices[v].avgEdgeLength * 10.0f;
 
         verts.Clear();
     }
 
     verts.Free();
+}
+
+// Source:
+// https://stackoverflow.com/questions/27589796/check-point-within-polygon?rq=1
+internal bool PointInsidePolygon(Vec2 p, const DynamicArray<Vec2>& polygon)
+{
+    int crossNumber = 0;
+
+    for (uint32 i = 0; i < polygon.size; i++) {
+        uint32 next = (i + 1) % polygon.size;
+        // If there's an upward or downward crossing
+        if (((polygon[i].y <= p.y) && (polygon[next].y > p.y))
+        || ((polygon[i].y > p.y) && (polygon[next].y <= p.y))) {
+            float vt = (float)(p.y - polygon[i].y)
+                / (polygon[next].y - polygon[i].y);
+            if (p.x < polygon[i].x + vt * (polygon[next].x - polygon[i].x)) {
+                crossNumber++;
+            }
+        }
+    }
+
+    return crossNumber % 2 == 1;
+}
+
+void MouseCastMeshFaces(const HalfEdgeMesh& mesh, Vec2 mousePos,
+    Mat4 proj, Mat4 view,
+    int screenWidth, int screenHeight,
+    DynamicArray<MouseCastFaceOut>& out)
+{
+    Mat4 toScreen = HomogeneousToScreen();
+
+    DynamicArray<Vec2> verts;
+    for (uint32 f = 0; f < mesh.faces.size; f++) {
+        uint32 edge = mesh.faces[f].halfEdge;
+        uint32 e = edge;
+        float32 avgZ = 0.0f;
+        do {
+            Vec3 vWorld = mesh.vertices[mesh.halfEdges[e].vertex].pos;
+            Vec4 vWorld4 = { vWorld.x, vWorld.y, vWorld.z, 1.0f };
+            Vec4 vScreen4 = proj * view * vWorld4;
+            vScreen4 /= vScreen4.w;
+            vScreen4 = toScreen * vScreen4;
+            Vec3 vScreen = { vScreen4.x, vScreen4.y, vScreen4.z };
+            verts.Append({ vScreen.x, vScreen.y });
+            avgZ += vScreen.z;
+
+            e = mesh.halfEdges[e].next;
+        } while (e != edge);
+        avgZ /= (float32)verts.size;
+
+        if (PointInsidePolygon(mousePos, verts)) {
+            MouseCastFaceOut faceOut = { f, avgZ };
+            out.Append(faceOut);
+        }
+
+        verts.Clear();
+    }
 }
 
 // Mesh traversal functions
@@ -502,8 +676,8 @@ void VerticesOnEdge(const HalfEdgeMesh& mesh, uint32 e,
     DynamicArray<uint32>& out)
 {
     uint32 twin = mesh.halfEdges[e].twin;
-    out.Append(mesh.halfEdges[e].vertex);
     out.Append(mesh.halfEdges[twin].vertex);
+    out.Append(mesh.halfEdges[e].vertex);
 }
 void FacesOnEdge(const HalfEdgeMesh& mesh, uint32 e,
     DynamicArray<uint32>& out)

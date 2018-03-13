@@ -14,7 +14,43 @@ void FilterModelLoad(FilterEntry* entry, SharedState* state)
         return;
     }
 
+    //ComputeVertexAvgEdgeLengths(&state->mesh);
+
     printf("Loaded model: %s\n", data->inputField.text);
+}
+
+void FilterSelect(FilterEntry* entry, SharedState* state)
+{
+    SelectData* data = (SelectData*)entry->data;
+
+    state->selectedVerts.Clear();
+    if (strcmp(data->inputField.text, "ALL") != 0) {
+        char selectStr[INPUT_BUFFER_SIZE];
+        uint32 len = (uint32)strnlen(data->inputField.text,
+            INPUT_BUFFER_SIZE - 1);
+        strncpy(selectStr, data->inputField.text, len);
+        selectStr[len] = '\0';
+
+        int iStr = 0;
+        bool done = false;
+        char* number = selectStr;
+        while (!done) {
+            if (selectStr[iStr] == ',' || selectStr[iStr] == '\0') {
+                if (selectStr[iStr] == '\0') {
+                    done = true;
+                }
+
+                selectStr[iStr] = '\0';
+                uint32 v = (uint32)strtol(number, nullptr, 10);
+                state->selectedVerts.Append(v);
+                number = &selectStr[iStr + 1];
+            }
+
+            iStr++;
+        }
+    }
+
+    printf("Selected: %s\n", data->inputField.text);
 }
 
 void FilterTranslate(FilterEntry* entry, SharedState* state)
@@ -22,7 +58,13 @@ void FilterTranslate(FilterEntry* entry, SharedState* state)
     Vec3Data* data = (Vec3Data*)entry->data;
     Vec3 offset = data->vector;
 
-    for (uint32 v = 0; v < state->mesh.vertices.size; v++) {
+    DynamicArray<uint32> vertices = state->selectedVerts;
+    if (state->selectedVerts.size == 0) {
+        vertices = state->allVerts;
+    }
+
+    for (uint32 i = 0; i < vertices.size; i++) {
+        uint32 v = vertices[i];
         state->mesh.vertices[v].pos += offset;
     }
 
@@ -37,7 +79,13 @@ void FilterRotate(FilterEntry* entry, SharedState* state)
         * QuatFromAngleUnitAxis(rot.y, Vec3::unitY)
         * QuatFromAngleUnitAxis(rot.x, Vec3::unitX);
 
-    for (uint32 v = 0; v < state->mesh.vertices.size; v++) {
+    DynamicArray<uint32> vertices = state->selectedVerts;
+    if (state->selectedVerts.size == 0) {
+        vertices = state->allVerts;
+    }
+
+    for (uint32 i = 0; i < vertices.size; i++) {
+        uint32 v = vertices[i];
         state->mesh.vertices[v].pos = rotQuat * state->mesh.vertices[v].pos;
     }
 
@@ -48,7 +96,13 @@ void FilterScale(FilterEntry* entry, SharedState* state)
     SingleFloatData* data = (SingleFloatData*)entry->data;
     float scale = data->value;
 
-    for (uint32 v = 0; v < state->mesh.vertices.size; v++) {
+    DynamicArray<uint32> vertices = state->selectedVerts;
+    if (state->selectedVerts.size == 0) {
+        vertices = state->allVerts;
+    }
+
+    for (uint32 i = 0; i < vertices.size; i++) {
+        uint32 v = vertices[i];
         state->mesh.vertices[v].pos *= scale;
     }
 
@@ -60,7 +114,13 @@ void FilterTwist(FilterEntry* entry, SharedState* state)
     SingleFloatData* data = (SingleFloatData*)entry->data;
     float value = data->value;
 
-    for (uint32 v = 0; v < state->mesh.vertices.size; v++) {
+    DynamicArray<uint32> vertices = state->selectedVerts;
+    if (state->selectedVerts.size == 0) {
+        vertices = state->allVerts;
+    }
+
+    for (uint32 i = 0; i < vertices.size; i++) {
+        uint32 v = vertices[i];
         float y = state->mesh.vertices[v].pos.y;
         Quat rot = QuatFromAngleUnitAxis(y * value, Vec3::unitY);
         state->mesh.vertices[v].pos = rot * state->mesh.vertices[v].pos;
@@ -74,8 +134,15 @@ void FilterInflate(FilterEntry* entry, SharedState* state)
     SingleFloatData* data = (SingleFloatData*)entry->data;
     float value = data->value;
 
-    for (uint32 v = 0; v < state->mesh.vertices.size; v++) {
-        state->mesh.vertices[v].pos += state->mesh.vertices[v].normal * value;
+    DynamicArray<uint32> vertices = state->selectedVerts;
+    if (state->selectedVerts.size == 0) {
+        vertices = state->allVerts;
+    }
+
+    for (uint32 i = 0; i < vertices.size; i++) {
+        uint32 v = vertices[i];
+        state->mesh.vertices[v].pos += state->mesh.vertices[v].normal
+            * state->mesh.vertices[v].avgEdgeLength * value;
     }
 
     printf("Inflated/Deflated by %f\n", value);
@@ -87,7 +154,13 @@ void FilterWacky(FilterEntry* entry, SharedState* state)
     float mag = data->value;
     float period = 0.25f;
 
-    for (uint32 v = 0; v < state->mesh.vertices.size; v++) {
+    DynamicArray<uint32> vertices = state->selectedVerts;
+    if (state->selectedVerts.size == 0) {
+        vertices = state->allVerts;
+    }
+
+    for (uint32 i = 0; i < vertices.size; i++) {
+        uint32 v = vertices[i];
         Vec3 pos = state->mesh.vertices[v].pos;
         float offset = mag * sinf(pos.y * 2.0f * PI_F / period);
         Vec3 newPos = { pos.x * (1.0f + offset), pos.y, pos.z };
@@ -102,10 +175,17 @@ void FilterNoise(FilterEntry* entry, SharedState* state)
     SingleFloatData* data = (SingleFloatData*)entry->data;
     float value = data->value;
 
-    for (uint32 v = 0; v < state->mesh.vertices.size; v++) {
+    DynamicArray<uint32> vertices = state->selectedVerts;
+    if (state->selectedVerts.size == 0) {
+        vertices = state->allVerts;
+    }
+
+    for (uint32 i = 0; i < vertices.size; i++) {
+        uint32 v = vertices[i];
         float random = (float)rand() / RAND_MAX;
         random = (random * 2.0f - 1.0f) * value;
-        state->mesh.vertices[v].pos += state->mesh.vertices[v].normal * random;
+        state->mesh.vertices[v].pos += state->mesh.vertices[v].normal
+            * state->mesh.vertices[v].avgEdgeLength * random;
     }
 
     printf("Applied noise amount %f\n", value);
@@ -118,14 +198,20 @@ void FilterULSmooth(FilterEntry* entry, SharedState* state)
     uint32 iterations = min(data->uintValue, MAX_ITERS);
     float32 delta = data->floatValue;
 
+    DynamicArray<uint32> vertices = state->selectedVerts;
+    if (state->selectedVerts.size == 0) {
+        vertices = state->allVerts;
+    }
+
     DynamicArray<uint32> verts;
     for (uint32 it = 0; it < iterations; it++) {
         HalfEdgeMesh meshCopy = CopyHalfEdgeMesh(state->mesh);
-        for (uint32 v = 0; v < meshCopy.vertices.size; v++) {
+        for (uint32 i = 0; i < vertices.size; i++) {
+            uint32 v = vertices[i];
             Vec3 avg = Vec3::zero;
             VerticesOnVertex(meshCopy, v, verts);
-            for (uint32 i = 0; i < verts.size; i++) {
-                avg += meshCopy.vertices[verts[i]].pos;
+            for (uint32 j = 0; j < verts.size; j++) {
+                avg += meshCopy.vertices[verts[j]].pos;
             }
             avg /= (float32)verts.size;
 
@@ -149,14 +235,20 @@ void FilterUSharpen(FilterEntry* entry, SharedState* state)
     uint32 iterations = min(data->uintValue, MAX_ITERS);
     float32 delta = data->floatValue;
 
+    DynamicArray<uint32> vertices = state->selectedVerts;
+    if (state->selectedVerts.size == 0) {
+        vertices = state->allVerts;
+    }
+
     DynamicArray<uint32> verts;
     for (uint32 it = 0; it < iterations; it++) {
         HalfEdgeMesh meshCopy = CopyHalfEdgeMesh(state->mesh);
-        for (uint32 v = 0; v < meshCopy.vertices.size; v++) {
+        for (uint32 i = 0; i < vertices.size; i++) {
+            uint32 v = vertices[i];
             Vec3 avg = Vec3::zero;
             VerticesOnVertex(meshCopy, v, verts);
-            for (uint32 i = 0; i < verts.size; i++) {
-                avg += meshCopy.vertices[verts[i]].pos;
+            for (uint32 j = 0; j < verts.size; j++) {
+                avg += meshCopy.vertices[verts[j]].pos;
             }
             avg /= (float32)verts.size;
 
@@ -184,9 +276,75 @@ void FilterTruncate(FilterEntry* entry, SharedState* state)
 {
     SingleFloatData* data = (SingleFloatData*)entry->data;
     float param = data->value;
-
-    for (uint32 v = 0; v < state->mesh.vertices.size; v++) {
+    if (param < 0.0f || param > 0.5f) {
+        printf("ERROR: Truncate parameter not in range [0, 0.5]\n");
+        return;
     }
+
+    DynamicArray<uint32> vertices = state->selectedVerts;
+    if (state->selectedVerts.size == 0) {
+        vertices = state->allVerts;
+    }
+    vertices = vertices.Copy();
+
+    DynamicArray<uint32> edges;
+    DynamicArray<uint32> newVerts;
+    for (uint32 i = 0; i < vertices.size; i++) {
+        uint32 v = vertices[i];
+        EdgesOnVertex(state->mesh, v, edges);
+        for (uint32 j = 0; j < edges.size; j++) {
+            newVerts.Append(SplitEdgeMakeVertex(&state->mesh, edges[j], param));
+        }
+
+        Face newFace;
+        newFace.halfEdge = edges[0];
+
+        uint32 lastTwinNext = state->mesh.halfEdges[edges[0]].next;
+        for (uint32 j = 0; j < edges.size; j++) {
+            uint32 prevInd = j - 1;
+            if (j == 0) {
+                prevInd = edges.size - 1;
+            }
+            uint32 nextInd = (j + 1) % edges.size;
+            uint32 twin = state->mesh.halfEdges[edges[j]].twin;
+            uint32 twinFace = state->mesh.halfEdges[twin].face;
+
+            // Modify incoming edge
+            state->mesh.halfEdges[twin].next =
+                state->mesh.halfEdges[edges[nextInd]].next;
+            state->mesh.halfEdges[twin].vertex = newVerts[nextInd];
+            // Ensure twin face points to an appropriate half edge
+            state->mesh.faces[twinFace].halfEdge = twin;
+
+            // Modify outgoing edge
+            state->mesh.halfEdges[edges[j]].next = edges[prevInd];
+            state->mesh.halfEdges[edges[j]].face = state->mesh.faces.size;
+        }
+        uint32 lastTwin = state->mesh.halfEdges[edges[edges.size - 1]].twin;
+        state->mesh.halfEdges[lastTwin].next = lastTwinNext;
+
+        state->mesh.faces.Append(newFace);
+        RemoveVertex(&state->mesh, v);
+        for (uint32 j = i + 1; j < vertices.size; j++) {
+            if (vertices[j] > v) {
+                vertices[j]--;
+            }
+        }
+
+        edges.Clear();
+        newVerts.Clear();
+    }
+
+    edges.Free();
+    newVerts.Free();
+    
+    vertices.Free();
+
+    //PrintHalfEdgeMeshFaces(state->mesh);
+
+    ComputeFaceNormals(&state->mesh);
+    ComputeVertexNormals(&state->mesh);
+    ComputeVertexAvgEdgeLengths(&state->mesh);
 
     printf("Truncated with parameter %f\n", param);
 }
@@ -235,6 +393,28 @@ void FilterUpdateModelLoad(FilterEntry* entry, Vec3 pos,
     Vec2 pos2D = { pos.x, pos.y };
     data->inputField.box.origin = pos2D;
     data->inputField.box.origin.y += 4.0f;
+    data->inputField.box.size = { FILTER_BOX_WIDTH, (float32)font.height };
+    UpdateInputFields(&data->inputField, 1, mousePos, clickState,
+        keyBuf, keyBufSize);
+    DrawInputFields(&data->inputField, 1, rectGL, textGL, font);
+}
+
+void FilterUpdateSelect(FilterEntry* entry, Vec3 pos,
+    RectGL rectGL, TextGL textGL, const FontFace& font,
+    Vec2 mousePos, int clickState, KeyEvent* keyBuf, uint32 keyBufSize)
+{
+    Vec2 size = {
+        FILTER_BOX_WIDTH,
+        2.0f * (float32)font.height + 10.0f
+    };
+    DrawFilterBase(entry, pos, size, rectGL, textGL, font,
+        mousePos, clickState);
+
+    SelectData* data = (SelectData*)entry->data;
+    Vec2 pos2D = { pos.x, pos.y };
+    data->inputField.box.origin = pos2D;
+    data->inputField.box.origin.y += 4.0f;
+    data->inputField.box.size = { FILTER_BOX_WIDTH, (float32)font.height };
     UpdateInputFields(&data->inputField, 1, mousePos, clickState,
         keyBuf, keyBufSize);
     DrawInputFields(&data->inputField, 1, rectGL, textGL, font);
@@ -407,8 +587,7 @@ internal void FilterCreateSingleUInt(Button* button, void* data,
     SingleUIntData* d =
         (SingleUIntData*)malloc(sizeof(SingleUIntData));
     d->inputValue = CreateInputField(
-        Vec2::zero,
-        Vec2::zero,
+        Vec2::zero, Vec2::zero,
         initVal,
         { 1.0f, 1.0f, 1.0f, 0.2f },
         { 1.0f, 1.0f, 1.0f, 0.4f },
@@ -431,8 +610,7 @@ internal void FilterCreateSingleFloat(Button* button, void* data,
     SingleFloatData* d =
         (SingleFloatData*)malloc(sizeof(SingleFloatData));
     d->inputValue = CreateInputField(
-        Vec2::zero,
-        Vec2::zero,
+        Vec2::zero, Vec2::zero,
         initVal,
         { 1.0f, 1.0f, 1.0f, 0.2f },
         { 1.0f, 1.0f, 1.0f, 0.4f },
@@ -455,8 +633,7 @@ internal void FilterCreateUIntFloat(Button* button, void* data,
     UIntFloatData* d = (UIntFloatData*)malloc(sizeof(UIntFloatData));
     for (int i = 0; i < 2; i++) {
         d->inputFields[i] = CreateInputField(
-            Vec2::zero,
-            Vec2::zero,
+            Vec2::zero, Vec2::zero,
             initVal,
             { 1.0f, 1.0f, 1.0f, 0.2f },
             { 1.0f, 1.0f, 1.0f, 0.4f },
@@ -480,8 +657,7 @@ internal void FilterCreateVec3(Button* button, void* data,
     Vec3Data* d = (Vec3Data*)malloc(sizeof(Vec3Data));
     for (int i = 0; i < 3; i++) {
         d->inputCoords[i] = CreateInputField(
-            Vec2::zero,
-            Vec2::zero,
+            Vec2::zero, Vec2::zero,
             initVal,
             { 1.0f, 1.0f, 1.0f, 0.2f },
             { 1.0f, 1.0f, 1.0f, 0.4f },
@@ -489,6 +665,42 @@ internal void FilterCreateVec3(Button* button, void* data,
             { 1.0f, 1.0f, 1.0f, 0.9f }
         );
     }
+
+    entry.data = (void*)d;
+
+    filters_.Append(entry);
+}
+
+void FilterButtonSelect(Button* button, void* data)
+{
+    SharedState* state = (SharedState*)data;
+    char selectionStr[INPUT_BUFFER_SIZE];
+    int iStr = 0;
+    for (uint32 i = 0; i < state->selectedVerts.size; i++) {
+        iStr += sprintf(selectionStr + iStr, "%d", state->selectedVerts[i]);
+        if (i != state->selectedVerts.size - 1) {
+            iStr += sprintf(selectionStr + iStr, ", ");
+        }
+    }
+    sprintf(selectionStr + iStr, "\0");
+
+    if (state->selectedVerts.size == 0) {
+        sprintf(selectionStr, "ALL\0");
+    }
+
+    FilterEntry entry = FilterButtonBase(button);
+    entry.updateFunc = FilterUpdateSelect;
+    entry.applyFunc = FilterSelect;
+
+    SelectData* d = (SelectData*)malloc(sizeof(SelectData));
+    d->inputField = CreateInputField(
+        Vec2::zero, Vec2::zero,
+        selectionStr,
+        { 1.0f, 1.0f, 1.0f, 0.2f },
+        { 1.0f, 1.0f, 1.0f, 0.4f },
+        { 1.0f, 1.0f, 1.0f, 0.5f },
+        { 1.0f, 1.0f, 1.0f, 0.9f }
+    );
 
     entry.data = (void*)d;
 
