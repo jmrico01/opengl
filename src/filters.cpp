@@ -195,7 +195,10 @@ void FilterULSmooth(FilterEntry* entry, SharedState* state)
 {
     const uint32 MAX_ITERS = 100000;
     UIntFloatData* data = (UIntFloatData*)entry->data;
-    uint32 iterations = std::min(data->uintValue, MAX_ITERS);
+    uint32 iterations = data->uintValue;
+    if (iterations > MAX_ITERS) {
+        iterations = MAX_ITERS;
+    }
     float32 delta = data->floatValue;
 
     DynamicArray<uint32> vertices = state->selectedVerts;
@@ -232,7 +235,10 @@ void FilterUSharpen(FilterEntry* entry, SharedState* state)
 {
     const uint32 MAX_ITERS = 100000;
     UIntFloatData* data = (UIntFloatData*)entry->data;
-    uint32 iterations = std::min(data->uintValue, MAX_ITERS);
+    uint32 iterations = data->uintValue;
+    if (iterations > MAX_ITERS) {
+        iterations = MAX_ITERS;
+    }
     float32 delta = data->floatValue;
 
     DynamicArray<uint32> vertices = state->selectedVerts;

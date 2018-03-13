@@ -45,10 +45,10 @@
 
 <p><hr><p><a name='Important Note'></a><h2>Important Note</h2><p><hr><p>
 
-    I developed this assignment from scratch in C++, using OpenGL and GLFW for cross-platform window creation, input handling, and GL context creation and binding. I recreated the JS GUI as well as I could.
+    I developed this assignment from scratch in C++, using OpenGL and GLFW for cross-platform window creation, input handling, and GL context creation and binding. I recreated the JS GUI as well as I could. All source code is in the "src" folder and is written by me, except for "glew.c" and possibly a few borrowed excerpts.
 
     <p>
-    This does mean, however, that I had to re-implement the entirety of the systems that are given to us. There include, but are probably not limited to:
+    I had to re-implement mostly all of the systems that are given to us. These include, but are probably not limited to:
     <ul>
         <li>Half Edge mesh data structure</li>
         <li>Parsing OBJ files into a Half Edge mesh</li>
@@ -57,13 +57,13 @@
         <li>Hot re-loading of meshes after modifications, with the option of selecting between vertex or face normals</li>
         <li>Filter selection, compounding, and removal system</li>
         <li>Mouse position raycasting against 3D mesh, closest face collision detection</li>
-        <li>Text rendering, with the help of Freetype</li>
+        <li>Text rendering, with the help of FreeType</li>
         <li>Interactive GUI elements in pixel coordinates</li>
         <li>Math library with Vectors, Matrices, Quaternions</li>
     </ul>
 
     <p>
-    In his office hours on March 9, Amit Bermano said a C++ implementation would be acceptable, and that I should turn it in as a Windows executable file, which is what I have done. The two external libraries I used (GLFW and Freetype) are statically linked, so program should require no external libraries other than the Visual C++ runtime (the latest one should work).
+    In his office hours on March 9, Amit Bermano said a C++ implementation would be acceptable, and that I should turn it in as a Windows executable file, which is what I have done. The two external libraries I used (GLFW and FreeType) are statically linked, so program should require no external libraries other than the Visual C++ runtime (the latest one should work). The executable is in the "build" directory.
 
     <p>
     The GUI controls are similar to the ones in the JS application. Clicking and dragging rotates the camera, scrolling controls the zoom, and clicking on the filters adds them to the active filters list. The red/green/blue lines correspond to the x/y/z axes, with the more colorful halves of the lines representing the positive direction.
@@ -72,7 +72,7 @@
     One of the main differences is that there are no parameter sliders: each value must be typed in (click the input field, and type the value). Since the implementation of these secondary systems (GUI input, etc) wasn't the main objective of the assignment, they are not tested for robustness, so please don't actively try to break them (unless you find that amusing, of course).
     
     <p>
-    Another significant difference is how vertex selection works. You can select vertices by clicking faces, but you can't select vertices one-by-one, because I wasn't sure how to make them easily clickable. In order to use this selection as a Filter, you must manually add a "Select" filter with the selection you desire. You always have the option to type in vertex indices into this selection filter box.
+    Another significant difference is how vertex selection works. You can select vertices by clicking faces, but you can't select vertices one-by-one, because I wasn't sure how to make them easily clickable. In order to use the current selection with other filters, you must manually add a "Select" filter with the desired selection. You always have the option to type in vertex indices into this selection filter box.
 
 <p><hr><p><a name='Translation'></a><h2>Translation</h2><p><hr><p>
     Implemented near the top of filters.cpp.
