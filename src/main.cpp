@@ -294,6 +294,7 @@ int main(int argc, char* argv[])
         library, "data/fonts/computer-modern/serif-bold.ttf", 128);*/
     
     const char* MODEL_START = "cube.obj";
+    //const char* MODEL_START = "tetrahedron.obj";
     { // Manually add model loading filter
         FilterEntry modelLoadFilter;
         modelLoadFilter.idx = -1;
@@ -592,11 +593,11 @@ int main(int argc, char* argv[])
             // Re-load mesh first
             filters_[0].applyFunc(&filters_[0], &state);
             state.selectedVerts.Clear();
-            state.allVerts.Clear();
-            for (uint32 v = 0; v < state.mesh.vertices.size; v++) {
-                state.allVerts.Append(v);
-            }
             for (uint32 i = 1; i < filters_.size; i++) {
+                state.allVerts.Clear();
+                for (uint32 v = 0; v < state.mesh.vertices.size; v++) {
+                    state.allVerts.Append(v);
+                }
                 filters_[i].applyFunc(&filters_[i], &state);
             }
             printf("-> Reloading mesh into OpenGL...\n");

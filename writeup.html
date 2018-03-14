@@ -35,13 +35,13 @@
 <li>(2.0) <a href='#Truncate'>Truncate</a></li>
 <!-- <li>(2.0) <a href='#Extrude'>Extrude</a></li>
 <li>(1.0) <a href='#Bevel'>Bevel</a></li>
-<li>(1.0) <a href='#Split+Long+Edges'>Split Long Edges</a></li>
+<li>(1.0) <a href='#Split+Long+Edges'>Split Long Edges</a></li> -->
 <li>(1.0) <a href='#Triangle+Topology'>Triangle Topology</a></li>
-<li>(1.0) <a href='#Loop+Subdivision'>Loop Subdivision</a></li>
+<!-- <li>(1.0) <a href='#Loop+Subdivision'>Loop Subdivision</a></li>
 <li>(1.0) <a href='#Quad+Topology'>Quad Topology</a></li>
-<li>(1.0) <a href='#Catmull-Clark+Subdivision'>Catmull-Clark Subdivision</a></li> 
+<li>(1.0) <a href='#Catmull-Clark+Subdivision'>Catmull-Clark Subdivision</a></li> -->
 <li>(1.0) <a href='#Art+Contest'>Art Contest</a></li>
-        </ul></div>-->
+        </ul></div>
 
 <p><hr><p><a name='Important Note'></a><h2>Important Note</h2><p><hr><p>
 
@@ -218,7 +218,7 @@
     Implemented near the top of filters.cpp.
 
     <p>
-    This was one of the trickier functions to implement, though the reason it took me so long was that I wasn't properly handling the removal of vertices from my mesh structure (everything is referenced by index, so I must decrease all indices upon removal of a vertex).
+    This was one of the trickier functions to implement, though the reason it took me so long was that I wasn't properly handling the removal of vertices from my mesh structure (everything is referenced by index, so I must decrease all indices upon removal of a vertex). It still doesn't work properly, since it operates on the modified mesh repeatedly as it truncates vertices, making a clean, "0.5" cut of all vertices of the cube, for example, not possible.
 
     <p>
     To implement this, I used SplitEdgeMakeVertex, which I also had to implement myself. I built in the parameter "t" into this function. I first split the neighboring edges for each vertex, and then used the old edges to stitch these new vertices together into a new face.
@@ -248,14 +248,18 @@
 
 <br><img src='results/placeholder.png'><br> <a href='batch.html?Base_Mesh=tetrahedron.obj&Display_Settings=false;true;flat;false;false;true;false;true;false&Selection=;1&Split_Long_Edges=1'>Base_Mesh=tetrahedron.obj&Display_Settings=false;true;flat;false;false;true;false;true;false&Selection=;1&Split_Long_Edges=1</a>
 
-<br><img src='results/placeholder.png'><p><hr><p><a name='Triangle+Topology'></a><h2>Triangle Topology</h2><p><hr><p>
-(Your description of your implentation of Triangle Topology goes here...)
+<br><img src='results/placeholder.png'>
+-->
+<p><hr><p><a name='Triangle+Topology'></a><h2>Triangle Topology</h2><p><hr><p>
+    Implemented in filters.cpp. Only works on the entire mesh, for now, since I don't have a good face selection mechanism, only vertex selection. Might have been easy to pick faces based on selected vertices...
 
-<br>You can include as many results as you want, but please at least include the following results:<br> <a href='batch.html?Base_Mesh=cube.obj&Display_Settings=false;true;flat;false;false;true;false;true;false&Tri_Topology=1'>Base_Mesh=cube.obj&Display_Settings=false;true;flat;false;false;true;false;true;false&Tri_Topology=1</a>
+    <p>
+    I first loop through every edge (NOT every half-edge), and split it. Then, I loop through the faces of the mesh, and go through the vertices. I connect all vertices that were created by an edge split, in order, using SplitFaceMakeEdge, making sure to give the arguments in an order such that the face I'm iterating over is never one of the outermost triangles.
 
-<br><img src='results/placeholder.png'><br> <a href='batch.html?Base_Mesh=cube.obj&Display_Settings=false;true;flat;false;false;true;false;true;false&Tri_Topology=3'>Base_Mesh=cube.obj&Display_Settings=false;true;flat;false;false;true;false;true;false&Tri_Topology=3</a>
-
-<br><img src='results/placeholder.png'><p><hr><p><a name='Loop+Subdivision'></a><h2>Loop Subdivision</h2><p><hr><p>
+<br><img src='results/tritop1.png'><br>
+<br><img src='results/tritop2.png'>
+<!--
+<p><hr><p><a name='Loop+Subdivision'></a><h2>Loop Subdivision</h2><p><hr><p>
 (Your description of your implentation of Loop Subdivision goes here...)
 
 <br>You can include as many results as you want, but please at least include the following results:<br> <a href='batch.html?Base_Mesh=cube.obj&Display_Settings=false;true;flat;false;false;true;false;true;false&Loop_Subdivision=3'>Base_Mesh=cube.obj&Display_Settings=false;true;flat;false;false;true;false;true;false&Loop_Subdivision=3</a>
@@ -276,11 +280,12 @@
 
 <br><img src='results/placeholder.png'><br> <a href='batch.html?Base_Mesh=cube.obj&Display_Settings=false;true;flat;false;false;true;false;true;false&Catmull-Clark=4'>Base_Mesh=cube.obj&Display_Settings=false;true;flat;false;false;true;false;true;false&Catmull-Clark=4</a>
 
-<br><img src='results/placeholder.png'><p><hr><p><a name='Art+Contest'></a><h2>Art Contest</h2><p><hr><p>
-(Your description of your implentation of Art Contest goes here...)
-
-<br>You can include as many results as you want, but please at least include the following results:
+<br><img src='results/placeholder.png'>
 -->
+
+<p><hr><p><a name='Art+Contest'></a><h2>Art Contest</h2><p><hr><p>
+
+<img src='results/art.png'>
 
 </div>
 </div>

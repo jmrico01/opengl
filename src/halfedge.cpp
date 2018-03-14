@@ -398,7 +398,7 @@ uint32 SplitEdgeMakeVertex(HalfEdgeMesh* mesh, uint32 e, float t)
     return mesh->vertices.size - 1;
 }
 
-// Make a new edge v1 -> v2, splitting face f.
+// Make a new edge v1 <-> v2, splitting face f.
 // f will now be v1 -> ... -> v2 -> v1
 // new face will be v2 -> ... -> v1 -> v2
 // Returns the new face index.
@@ -574,7 +574,7 @@ void ComputeVertexAvgEdgeLengths(HalfEdgeMesh* mesh)
             sumDists += Mag(edgeVec);
         }
         mesh->vertices[v].avgEdgeLength = sumDists / (float32)verts.size;
-        //mesh->vertices[v].color.r = mesh->vertices[v].avgEdgeLength * 10.0f;
+        //mesh->vertices[v].color.r = mesh->vertices[v].avgEdgeLength * 12.0f;
 
         verts.Clear();
     }

@@ -293,6 +293,16 @@ void FilterTruncate(FilterEntry* entry, SharedState* state)
     }
     vertices = vertices.Copy();
 
+    /*DynamicArray<uint32> verticesNew = vertices.Copy();
+    for (uint32 i = 0; i < verticesNew.size; i++) {
+        for (uint32 j = i + 1; j < verticesNew.size; j++) {
+            if (verticesNew[j] > verticesNew[i]) {
+                verticesNew[i]--;
+            }
+        }
+    }
+    HalfEdgeMesh meshCopy = CopyHalfEdgeMesh(state->mesh);*/
+
     DynamicArray<uint32> edges;
     DynamicArray<uint32> newVerts;
     for (uint32 i = 0; i < vertices.size; i++) {
@@ -357,11 +367,57 @@ void FilterTruncate(FilterEntry* entry, SharedState* state)
 
 void FilterTriangleTopology(FilterEntry* entry, SharedState* state)
 {
-    printf("tri top\n");
+    SingleUIntData* data = (SingleUIntData*)entry->data;
+    uint32 iterations = data->value;
+
+    TriangulateMesh(&state->mesh);
+
+    for (uint32 it = 0; it < iterations; it++) {
+        uint32 numVertsOriginal = state->mesh.vertices.size;
+        uint32 numEdgesOriginal = state->mesh.halfEdges.size;
+        uint32 numFacesOriginal = state->mesh.faces.size;
+        bool* isSplit = (bool*)malloc(sizeof(bool) * numEdgesOriginal);
+        for (uint32 e = 0; e < numEdgesOriginal; e++) {
+            isSplit[e] = false;
+        }
+        for (uint32 e = 0; e < numEdgesOriginal; e++) {
+            if (!isSplit[e] && !isSplit[state->mesh.halfEdges[e].twin]) {
+                SplitEdgeMakeVertex(&state->mesh, e, 0.5f);
+                isSplit[e] = true;
+                isSplit[state->mesh.halfEdges[e].twin] = true;
+            }
+        }
+
+        for (uint32 f = 0; f < numFacesOriginal; f++) {
+            DynamicArray<uint32> edges;
+            EdgesOnFace(state->mesh, f, edges);
+            int prevMidVertex = -1;
+            int firstMidVertex = -1;
+            for (uint32 i = 0; i < edges.size; i++) {
+                uint32 v = state->mesh.halfEdges[edges[i]].vertex;
+                if (v >= numVertsOriginal) {
+                    if (firstMidVertex == -1) {
+                        firstMidVertex = (int)v;
+                    }
+                    if (prevMidVertex != -1) {
+                        SplitFaceMakeEdge(&state->mesh, f, v, prevMidVertex);
+                    }
+                    prevMidVertex = (int)v;
+                }
+            }
+            SplitFaceMakeEdge(&state->mesh, f, firstMidVertex, prevMidVertex);
+        }
+    }
+
+    ComputeFaceNormals(&state->mesh);
+    ComputeVertexNormals(&state->mesh);
+    ComputeVertexAvgEdgeLengths(&state->mesh);
+
+    printf("Performed triangle topology, iterations: %d\n", iterations);
 }
 void FilterLoopSubdivision(FilterEntry* entry, SharedState* state)
 {
-    printf("loop subdivision\n");
+    //printf("loop subdivision\n");
 }
 
 internal void DrawFilterBase(FilterEntry* entry, Vec3 pos, Vec2 size,
@@ -445,6 +501,29 @@ internal void FilterUpdateNoArgs(FilterEntry* entry, Vec3 pos,
     };
     DrawFilterBase(entry, pos, size, rectGL, textGL, font,
         mousePos, clickState);
+}
+
+internal void FilterUpdateSingleUInt(FilterEntry* entry, Vec3 pos,
+    RectGL rectGL, TextGL textGL, const FontFace& font,
+    Vec2 mousePos, int clickState, KeyEvent* keyBuf, uint32 keyBufSize)
+{
+    Vec2 size = {
+        FILTER_BOX_WIDTH,
+        2.0f * (float32)font.height + 10.0f
+    };
+    DrawFilterBase(entry, pos, size, rectGL, textGL, font,
+        mousePos, clickState);
+
+    SingleUIntData* data = (SingleUIntData*)entry->data;
+    Vec2 pos2D = { pos.x, pos.y };
+    Vec2 inputSize = { size.x, (float32)font.height };
+    data->inputValue.box.origin = pos2D;
+    data->inputValue.box.size = inputSize;
+    UpdateInputFields(&data->inputValue, 1, mousePos, clickState,
+        keyBuf, keyBufSize);
+    DrawInputFields(&data->inputValue, 1, rectGL, textGL, font);
+
+    data->value = (uint32)strtol(data->inputValue.text, nullptr, 10);
 }
 
 internal void FilterUpdateSingleFloat(FilterEntry* entry, Vec3 pos,
@@ -565,6 +644,29 @@ internal void FilterCreateNoArgs(Button* button, void* data,
     entry.applyFunc = filterFunc;
 
     entry.data = nullptr;
+
+    filters_.Append(entry);
+}
+
+internal void FilterCreateSingleUInt(Button* button, void* data,
+    const char* initVal, FilterApplyFunc filterFunc)
+{
+    FilterEntry entry = FilterButtonBase(button);
+    entry.updateFunc = FilterUpdateSingleUInt;
+    entry.applyFunc = filterFunc;
+
+    SingleUIntData* d =
+        (SingleUIntData*)malloc(sizeof(SingleUIntData));
+    d->inputValue = CreateInputField(
+        Vec2::zero, Vec2::zero,
+        initVal,
+        { 1.0f, 1.0f, 1.0f, 0.2f },
+        { 1.0f, 1.0f, 1.0f, 0.4f },
+        { 1.0f, 1.0f, 1.0f, 0.5f },
+        { 1.0f, 1.0f, 1.0f, 0.9f }
+    );
+
+    entry.data = (void*)d;
 
     filters_.Append(entry);
 }
@@ -726,7 +828,7 @@ void FilterButtonTruncate(Button* button, void* data)
 
 void FilterButtonTriangleTopology(Button* button, void* data)
 {
-    FilterCreateNoArgs(button, data, FilterTriangleTopology);
+    FilterCreateSingleUInt(button, data, "1", FilterTriangleTopology);
 }
 void FilterButtonLoopSubdivision(Button* button, void* data)
 {
