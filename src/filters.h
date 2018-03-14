@@ -107,7 +107,7 @@ struct FilterInfo {
     { "Truncate",           FilterButtonTruncate },
     { "",                   FilterButtonNone },
     { "Triangle Topology",  FilterButtonTriangleTopology },
-    { "Loop Subdivision",   FilterButtonLoopSubdivision },
+    //{ "Loop Subdivision",   FilterButtonLoopSubdivision },
 };
 
 const int numFilters_ = sizeof(filterInfo_) / sizeof(filterInfo_[0]);
